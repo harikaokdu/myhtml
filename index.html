@@ -1,0 +1,3278 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>المنصة التعليمية الإدارية</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                    }
+                }
+            },
+            darkMode: 'class'
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
+        
+        * {
+            font-family: 'Cairo', sans-serif;
+        }
+        
+        .dark {
+            --bg-color: #181818;
+            --text-color: #ffffff;
+            --card-bg: #242424;
+            --border-color: #3a3a3a;
+        }
+        
+        body:not(.dark) {
+            --bg-color: #ffffff;
+            --text-color: #333333;
+            --card-bg: #f8f8f8;
+            --border-color: #e6e6e6;
+        }
+        
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .loader {
+            border-top-color: #5D5CDE;
+            animation: spinner 1.5s linear infinite;
+        }
+        
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* اضافة دعم الطباعة */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            
+            .print-only {
+                display: block !important;
+            }
+            
+            body {
+                background-color: white;
+                color: black;
+            }
+        }
+        
+        /* تخصيص مظهر PDF */
+        .pdf-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .pdf-footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 10px;
+        }
+        
+        /* تخصيص الحقول */
+        input, select, textarea {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            border-color: var(--border-color);
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="min-h-screen">
+        <!-- شاشة تسجيل الدخول -->
+        <div id="login-screen" class="flex flex-col items-center justify-center min-h-screen p-4">
+            <div class="card p-8 rounded-lg shadow-lg w-full max-w-md">
+                <div class="text-center mb-6">
+                    <h1 class="text-2xl font-bold text-primary">المنصة التعليمية الإدارية</h1>
+                    <p class="text-sm opacity-75 mt-2">تسجيل الدخول للوصول إلى حسابك</p>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="username" class="block text-sm font-medium mb-1">اسم المستخدم</label>
+                    <input type="text" id="username" class="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base" placeholder="أدخل اسم المستخدم">
+                </div>
+                
+                <div class="mb-6">
+                    <label for="password" class="block text-sm font-medium mb-1">كلمة المرور</label>
+                    <input type="password" id="password" class="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base" placeholder="أدخل كلمة المرور">
+                </div>
+                
+                <div id="error-message" class="hidden mb-4 text-sm text-red-500 text-center"></div>
+                
+                <button id="login-btn" class="w-full py-2 px-4 bg-primary text-white rounded-md hover:bg-opacity-90 transition-all">
+                    تسجيل الدخول
+                </button>
+            </div>
+        </div>
+
+        <!-- لوحة تحكم المدير -->
+        <div id="admin-dashboard" class="hidden">
+            <header class="bg-primary text-white shadow">
+                <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+                    <h1 class="text-xl font-bold">لوحة تحكم المدير</h1>
+                    <div class="flex items-center space-x-4 space-x-reverse">
+                        <span id="admin-name" class="text-sm"></span>
+                        <button id="admin-logout" class="text-sm px-3 py-1 bg-white bg-opacity-20 rounded-md hover:bg-opacity-30 transition-all">تسجيل الخروج</button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="container mx-auto px-4 py-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <button class="admin-nav-btn card p-4 rounded-lg text-center cursor-pointer hover:shadow-md transition-all" data-target="manage-teachers">
+                        <div class="font-bold mb-2">إدارة الأساتذة</div>
+                        <div class="text-sm opacity-75">إضافة وتعديل وعرض حسابات الأساتذة</div>
+                    </button>
+                    <button class="admin-nav-btn card p-4 rounded-lg text-center cursor-pointer hover:shadow-md transition-all" data-target="manage-students">
+                        <div class="font-bold mb-2">إدارة الطلبة</div>
+                        <div class="text-sm opacity-75">إضافة وتعديل وعرض حسابات الطلبة</div>
+                    </button>
+                    <button class="admin-nav-btn card p-4 rounded-lg text-center cursor-pointer hover:shadow-md transition-all" data-target="manage-courses">
+                        <div class="font-bold mb-2">إدارة المواد</div>
+                        <div class="text-sm opacity-75">إضافة وتعديل المواد وتخصيصها للأساتذة</div>
+                    </button>
+                    <button class="admin-nav-btn card p-4 rounded-lg text-center cursor-pointer hover:shadow-md transition-all" data-target="manage-schedules">
+                        <div class="font-bold mb-2">الجداول الزمنية</div>
+                        <div class="text-sm opacity-75">إدارة جداول الحصص والامتحانات</div>
+                    </button>
+                </div>
+
+                <!-- قسم إدارة الأساتذة -->
+                <div id="manage-teachers" class="admin-section hidden">
+                    <h2 class="text-xl font-bold mb-4">إدارة الأساتذة</h2>
+
+                    <div class="card p-4 rounded-lg mb-6">
+                        <h3 class="font-bold mb-3">إضافة أستاذ جديد</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">اسم المستخدم</label>
+                                <input type="text" id="new-teacher-username" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">الاسم</label>
+                                <input type="text" id="new-teacher-firstname" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">اللقب</label>
+                                <input type="text" id="new-teacher-lastname" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                            </div>
+                        </div>
+                        <button id="add-teacher-btn" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-opacity-90 transition-all">إضافة أستاذ</button>
+                    </div>
+
+                    <div class="card p-4 rounded-lg">
+                        <h3 class="font-bold mb-3">قائمة الأساتذة</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full table-auto border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-100 dark:bg-gray-700">
+                                        <th class="px-4 py-2 text-right">اسم المستخدم</th>
+                                        <th class="px-4 py-2 text-right">الاسم</th>
+                                        <th class="px-4 py-2 text-right">اللقب</th>
+                                        <th class="px-4 py-2 text-right">الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="teachers-list">
+                                    <!-- سيتم ملء هذا الجدول ديناميكيًا -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- قسم إدارة الطلبة -->
+                <div id="manage-students" class="admin-section hidden">
+                    <h2 class="text-xl font-bold mb-4">إدارة الطلبة</h2>
+
+                    <div class="card p-4 rounded-lg mb-6">
+                        <h3 class="font-bold mb-3">إضافة طالب جديد</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">اسم المستخدم</label>
+                                <input type="text" id="new-student-username" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">الاسم</label>
+                                <input type="text" id="new-student-firstname" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">اللقب</label>
+                                <input type="text" id="new-student-lastname" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">رقم التسجيل</label>
+                                <input type="text" id="new-student-regnum" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                            </div>
+                        </div>
+                        <button id="add-student-btn" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-opacity-90 transition-all">إضافة طالب</button>
+                    </div>
+
+                    <div class="card p-4 rounded-lg">
+                        <h3 class="font-bold mb-3">قائمة الطلبة</h3>
+                        <div class="mb-4">
+                            <button id="export-students-excel" class="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-opacity-90 transition-all mr-2">تصدير إلى Excel</button>
+                            <button id="export-students-pdf" class="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-opacity-90 transition-all">تصدير إلى PDF</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full table-auto border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-100 dark:bg-gray-700">
+                                        <th class="px-4 py-2 text-right">اسم المستخدم</th>
+                                        <th class="px-4 py-2 text-right">الاسم</th>
+                                        <th class="px-4 py-2 text-right">اللقب</th>
+                                        <th class="px-4 py-2 text-right">رقم التسجيل</th>
+                                        <th class="px-4 py-2 text-right">المعدل العام</th>
+                                        <th class="px-4 py-2 text-right">الأرصدة</th>
+                                        <th class="px-4 py-2 text-right">الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="students-list">
+                                    <!-- سيتم ملء هذا الجدول ديناميكيًا -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- قسم إدارة المواد -->
+                <div id="manage-courses" class="admin-section hidden">
+                    <h2 class="text-xl font-bold mb-4">إدارة المواد</h2>
+
+                    <div class="card p-4 rounded-lg mb-6">
+                        <h3 class="font-bold mb-3">إضافة مادة جديدة</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-1">اسم المادة</label>
+                                <input type="text" id="new-course-name" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">الرمز</label>
+                                <input type="text" id="new-course-code" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-1">عدد الأرصدة</label>
+                                <input type="number" id="new-course-credits" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base" min="0" max="10" value="1">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                            <div class="flex items-center">
+                                <input type="checkbox" id="new-course-has-td" class="mr-2">
+                                <label for="new-course-has-td" class="text-sm">أعمال توجيهية (TD)</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="new-course-has-tp" class="mr-2">
+                                <label for="new-course-has-tp" class="text-sm">أعمال تطبيقية (TP)</label>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" id="new-course-has-exam" class="mr-2" checked>
+                                <label for="new-course-has-exam" class="text-sm">امتحان</label>
+                            </div>
+                        </div>
+
+                        <button id="add-course-btn" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-opacity-90 transition-all">إضافة مادة</button>
+                    </div>
+
+                    <div class="card p-4 rounded-lg">
+                        <h3 class="font-bold mb-3">قائمة المواد</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full table-auto border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-100 dark:bg-gray-700">
+                                        <th class="px-4 py-2 text-right">اسم المادة</th>
+                                        <th class="px-4 py-2 text-right">الرمز</th>
+                                        <th class="px-4 py-2 text-right">الأرصدة</th>
+                                        <th class="px-4 py-2 text-right">المكونات</th>
+                                        <th class="px-4 py-2 text-right">تخصيص الأساتذة</th>
+                                        <th class="px-4 py-2 text-right">الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="courses-list">
+                                    <!-- سيتم ملء هذا الجدول ديناميكيًا -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- قسم إدارة الجداول الزمنية -->
+                <div id="manage-schedules" class="admin-section hidden">
+                    <h2 class="text-xl font-bold mb-4">إدارة الجداول الزمنية</h2>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- جدول الحصص -->
+                        <div class="card p-4 rounded-lg">
+                            <h3 class="font-bold mb-3">جدول الحصص</h3>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-1">اختر المادة</label>
+                                <select id="schedule-course" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                                    <!-- سيتم ملء هذه القائمة ديناميكيًا -->
+                                </select>
+                            </div>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-1">اختر النوع</label>
+                                <select id="schedule-type" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                                    <option value="lecture">محاضرة</option>
+                                    <option value="td">أعمال توجيهية</option>
+                                    <option value="tp">أعمال تطبيقية</option>
+                                </select>
+                            </div>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-1">اليوم</label>
+                                <select id="schedule-day" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                                    <option value="sunday">الأحد</option>
+                                    <option value="monday">الإثنين</option>
+                                    <option value="tuesday">الثلاثاء</option>
+                                    <option value="wednesday">الأربعاء</option>
+                                    <option value="thursday">الخميس</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">وقت البدء</label>
+                                    <input type="time" id="schedule-start-time" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">وقت الانتهاء</label>
+                                    <input type="time" id="schedule-end-time" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-1">القاعة</label>
+                                <input type="text" id="schedule-room" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                            </div>
+                            <button id="add-schedule-btn" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-opacity-90 transition-all">إضافة إلى الجدول</button>
+                            
+                            <div class="mt-4">
+                                <button id="export-schedule-pdf" class="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-opacity-90 transition-all">تصدير الجدول إلى PDF</button>
+                            </div>
+                        </div>
+
+                        <!-- جدول الامتحانات -->
+                        <div class="card p-4 rounded-lg">
+                            <h3 class="font-bold mb-3">جدول الامتحانات</h3>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-1">اختر المادة</label>
+                                <select id="exam-course" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                                    <!-- سيتم ملء هذه القائمة ديناميكيًا -->
+                                </select>
+                            </div>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-1">التاريخ</label>
+                                <input type="date" id="exam-date" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">وقت البدء</label>
+                                    <input type="time" id="exam-start-time" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">وقت الانتهاء</label>
+                                    <input type="time" id="exam-end-time" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-1">القاعة</label>
+                                <input type="text" id="exam-room" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                            </div>
+                            <button id="add-exam-btn" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-opacity-90 transition-all">إضافة إلى جدول الامتحانات</button>
+                            
+                            <div class="mt-4">
+                                <button id="export-exams-pdf" class="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-opacity-90 transition-all">تصدير جدول الامتحانات إلى PDF</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                        <div class="card p-4 rounded-lg">
+                            <h3 class="font-bold mb-3">قائمة الحصص المبرمجة</h3>
+                            <div class="overflow-x-auto">
+                                <table class="w-full table-auto border-collapse">
+                                    <thead>
+                                        <tr class="bg-gray-100 dark:bg-gray-700">
+                                            <th class="px-4 py-2 text-right">المادة</th>
+                                            <th class="px-4 py-2 text-right">النوع</th>
+                                            <th class="px-4 py-2 text-right">اليوم</th>
+                                            <th class="px-4 py-2 text-right">الوقت</th>
+                                            <th class="px-4 py-2 text-right">القاعة</th>
+                                            <th class="px-4 py-2 text-right">الإجراءات</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="schedules-list">
+                                        <!-- سيتم ملء هذا الجدول ديناميكيًا -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="card p-4 rounded-lg">
+                            <h3 class="font-bold mb-3">قائمة الامتحانات المبرمجة</h3>
+                            <div class="overflow-x-auto">
+                                <table class="w-full table-auto border-collapse">
+                                    <thead>
+                                        <tr class="bg-gray-100 dark:bg-gray-700">
+                                            <th class="px-4 py-2 text-right">المادة</th>
+                                            <th class="px-4 py-2 text-right">التاريخ</th>
+                                            <th class="px-4 py-2 text-right">الوقت</th>
+                                            <th class="px-4 py-2 text-right">القاعة</th>
+                                            <th class="px-4 py-2 text-right">الإجراءات</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="exams-list">
+                                        <!-- سيتم ملء هذا الجدول ديناميكيًا -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- لوحة تحكم الأستاذ -->
+        <div id="teacher-dashboard" class="hidden">
+            <header class="bg-primary text-white shadow">
+                <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+                    <h1 class="text-xl font-bold">لوحة تحكم الأستاذ</h1>
+                    <div class="flex items-center space-x-4 space-x-reverse">
+                        <div class="relative">
+                            <button id="teacher-notifications-btn" class="text-sm px-3 py-1 bg-white bg-opacity-20 rounded-md hover:bg-opacity-30 transition-all">
+                                الإشعارات
+                                <span id="notifications-count" class="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center text-xs bg-red-500 text-white rounded-full hidden">0</span>
+                            </button>
+                            <div id="notifications-dropdown" class="absolute left-0 mt-2 w-64 bg-white dark:bg-gray-800 shadow-lg rounded-md p-2 z-10 hidden">
+                                <div id="notifications-list" class="max-h-64 overflow-y-auto">
+                                    <!-- سيتم ملء هذه القائمة ديناميكيًا -->
+                                    <div class="text-sm text-center text-gray-500 dark:text-gray-400">لا توجد إشعارات</div>
+                                </div>
+                            </div>
+                        </div>
+                        <span id="teacher-name" class="text-sm"></span>
+                        <button id="teacher-logout" class="text-sm px-3 py-1 bg-white bg-opacity-20 rounded-md hover:bg-opacity-30 transition-all">تسجيل الخروج</button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="container mx-auto px-4 py-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <button class="teacher-nav-btn card p-4 rounded-lg text-center cursor-pointer hover:shadow-md transition-all" data-target="my-courses">
+                        <div class="font-bold mb-2">المواد المخصصة لي</div>
+                        <div class="text-sm opacity-75">عرض وإدارة المواد المسندة إليك</div>
+                    </button>
+                    <button class="teacher-nav-btn card p-4 rounded-lg text-center cursor-pointer hover:shadow-md transition-all" data-target="my-schedule">
+                        <div class="font-bold mb-2">جدولي الزمني</div>
+                        <div class="text-sm opacity-75">عرض جدول الحصص الخاص بك</div>
+                    </button>
+                    <button class="teacher-nav-btn card p-4 rounded-lg text-center cursor-pointer hover:shadow-md transition-all" data-target="my-exams">
+                        <div class="font-bold mb-2">جدول الامتحانات</div>
+                        <div class="text-sm opacity-75">عرض جدول الامتحانات الخاص بموادك</div>
+                    </button>
+                </div>
+
+                <!-- قسم المواد المخصصة للأستاذ -->
+                <div id="my-courses" class="teacher-section hidden">
+                    <h2 class="text-xl font-bold mb-4">المواد المخصصة لي</h2>
+                    <div id="teacher-courses" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- سيتم ملء هذا القسم ديناميكيًا -->
+                    </div>
+                </div>
+
+                <!-- قسم جدول الحصص للأستاذ -->
+                <div id="my-schedule" class="teacher-section hidden">
+                    <h2 class="text-xl font-bold mb-4">جدولي الزمني</h2>
+                    <div class="card p-4 rounded-lg">
+                        <div class="grid grid-cols-5 gap-4">
+                            <div class="font-bold text-center py-2 bg-gray-100 dark:bg-gray-700 rounded">الأحد</div>
+                            <div class="font-bold text-center py-2 bg-gray-100 dark:bg-gray-700 rounded">الإثنين</div>
+                            <div class="font-bold text-center py-2 bg-gray-100 dark:bg-gray-700 rounded">الثلاثاء</div>
+                            <div class="font-bold text-center py-2 bg-gray-100 dark:bg-gray-700 rounded">الأربعاء</div>
+                            <div class="font-bold text-center py-2 bg-gray-100 dark:bg-gray-700 rounded">الخميس</div>
+                        </div>
+                        <div class="grid grid-cols-5 gap-4 mt-2" id="teacher-schedule-grid">
+                            <!-- سيتم ملء هذا الجدول ديناميكيًا -->
+                            <div id="sunday-schedule" class="min-h-[200px]"></div>
+                            <div id="monday-schedule" class="min-h-[200px]"></div>
+                            <div id="tuesday-schedule" class="min-h-[200px]"></div>
+                            <div id="wednesday-schedule" class="min-h-[200px]"></div>
+                            <div id="thursday-schedule" class="min-h-[200px]"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- قسم جدول الامتحانات للأستاذ -->
+                <div id="my-exams" class="teacher-section hidden">
+                    <h2 class="text-xl font-bold mb-4">جدول الامتحانات</h2>
+                    <div class="card p-4 rounded-lg">
+                        <div class="overflow-x-auto">
+                            <table class="w-full table-auto border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-100 dark:bg-gray-700">
+                                        <th class="px-4 py-2 text-right">المادة</th>
+                                        <th class="px-4 py-2 text-right">التاريخ</th>
+                                        <th class="px-4 py-2 text-right">الوقت</th>
+                                        <th class="px-4 py-2 text-right">القاعة</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="teacher-exams-list">
+                                    <!-- سيتم ملء هذا الجدول ديناميكيًا -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- نافذة إدخال العلامات -->
+                <div id="course-grades-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 id="grade-modal-title" class="text-xl font-bold">إدخال العلامات</h3>
+                            <button id="close-grades-modal" class="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="mb-4">
+                            <div class="flex items-center mb-2">
+                                <h4 id="grade-course-info" class="text-lg font-semibold"></h4>
+                                <span id="grade-component-info" class="ml-2 px-2 py-1 text-xs rounded bg-primary text-white"></span>
+                            </div>
+                            
+                            <div class="mb-4 flex justify-between">
+                                <button id="import-grades-excel" class="px-3 py-1 bg-green-600 text-white rounded-md hover:bg-opacity-90 transition-all">استيراد من Excel</button>
+                                <button id="export-grades-excel" class="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-opacity-90 transition-all">تصدير إلى Excel</button>
+                                <button id="export-grades-pdf" class="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-opacity-90 transition-all">تصدير إلى PDF</button>
+                                <input type="file" id="excel-import-input" class="hidden" accept=".xlsx, .xls">
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="w-full table-auto border-collapse">
+                                    <thead>
+                                        <tr class="bg-gray-100 dark:bg-gray-700">
+                                            <th class="px-4 py-2 text-right">الاسم</th>
+                                            <th class="px-4 py-2 text-right">اللقب</th>
+                                            <th class="px-4 py-2 text-right">رقم التسجيل</th>
+                                            <th class="px-4 py-2 text-right">العلامة</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="students-grades-list">
+                                        <!-- سيتم ملء هذا الجدول ديناميكيًا -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end">
+                            <button id="save-grades" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-opacity-90 transition-all">حفظ العلامات</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- لوحة تحكم الطالب -->
+        <div id="student-dashboard" class="hidden">
+            <header class="bg-primary text-white shadow">
+                <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+                    <h1 class="text-xl font-bold">لوحة تحكم الطالب</h1>
+                    <div class="flex items-center space-x-4 space-x-reverse">
+                        <span id="student-name" class="text-sm"></span>
+                        <button id="student-logout" class="text-sm px-3 py-1 bg-white bg-opacity-20 rounded-md hover:bg-opacity-30 transition-all">تسجيل الخروج</button>
+                    </div>
+                </div>
+            </header>
+
+            <div class="container mx-auto px-4 py-6">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                    <button class="student-nav-btn card p-4 rounded-lg text-center cursor-pointer hover:shadow-md transition-all" data-target="my-grades">
+                        <div class="font-bold mb-2">علاماتي</div>
+                        <div class="text-sm opacity-75">عرض العلامات والنتائج</div>
+                    </button>
+                    <button class="student-nav-btn card p-4 rounded-lg text-center cursor-pointer hover:shadow-md transition-all" data-target="student-schedule">
+                        <div class="font-bold mb-2">جدولي الزمني</div>
+                        <div class="text-sm opacity-75">عرض جدول الحصص</div>
+                    </button>
+                    <button class="student-nav-btn card p-4 rounded-lg text-center cursor-pointer hover:shadow-md transition-all" data-target="student-exams">
+                        <div class="font-bold mb-2">جدول الامتحانات</div>
+                        <div class="text-sm opacity-75">عرض جدول الامتحانات</div>
+                    </button>
+                    <button class="student-nav-btn card p-4 rounded-lg text-center cursor-pointer hover:shadow-md transition-all" data-target="student-progress">
+                        <div class="font-bold mb-2">تقدمي الدراسي</div>
+                        <div class="text-sm opacity-75">عرض التقدم والأرصدة</div>
+                    </button>
+                    <button class="student-nav-btn card p-4 rounded-lg text-center cursor-pointer hover:shadow-md transition-all" data-target="student-profile">
+                        <div class="font-bold mb-2">بطاقة الطالب</div>
+                        <div class="text-sm opacity-75">عرض معلوماتك الشخصية</div>
+                    </button>
+                </div>
+
+                <!-- قسم علامات الطالب -->
+                <div id="my-grades" class="student-section hidden">
+                    <h2 class="text-xl font-bold mb-4">علاماتي</h2>
+                    <div class="mb-4">
+                        <button id="student-export-grades-pdf" class="px-3 py-1 bg-red-600 text-white rounded-md hover:bg-opacity-90 transition-all">تصدير كشف العلامات إلى PDF</button>
+                    </div>
+                    <div class="card p-4 rounded-lg">
+                        <div class="overflow-x-auto">
+                            <table class="w-full table-auto border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-100 dark:bg-gray-700">
+                                        <th class="px-4 py-2 text-right">المادة</th>
+                                        <th class="px-4 py-2 text-right">الأستاذ</th>
+                                        <th class="px-4 py-2 text-right">أعمال توجيهية</th>
+                                        <th class="px-4 py-2 text-right">أعمال تطبيقية</th>
+                                        <th class="px-4 py-2 text-right">الامتحان</th>
+                                        <th class="px-4 py-2 text-right">المعدل</th>
+                                        <th class="px-4 py-2 text-right">الأرصدة</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="student-grades-list">
+                                    <!-- سيتم ملء هذا الجدول ديناميكيًا -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="flex justify-end items-center mt-6 text-lg font-bold">
+                            المعدل العام: <span id="student-overall-average" class="mr-2"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- قسم جدول الحصص للطالب -->
+                <div id="student-schedule" class="student-section hidden">
+                    <h2 class="text-xl font-bold mb-4">جدولي الزمني</h2>
+                    <div class="card p-4 rounded-lg">
+                        <div class="grid grid-cols-5 gap-4">
+                            <div class="font-bold text-center py-2 bg-gray-100 dark:bg-gray-700 rounded">الأحد</div>
+                            <div class="font-bold text-center py-2 bg-gray-100 dark:bg-gray-700 rounded">الإثنين</div>
+                            <div class="font-bold text-center py-2 bg-gray-100 dark:bg-gray-700 rounded">الثلاثاء</div>
+                            <div class="font-bold text-center py-2 bg-gray-100 dark:bg-gray-700 rounded">الأربعاء</div>
+                            <div class="font-bold text-center py-2 bg-gray-100 dark:bg-gray-700 rounded">الخميس</div>
+                        </div>
+                        <div class="grid grid-cols-5 gap-4 mt-2" id="student-schedule-grid">
+                            <!-- سيتم ملء هذا الجدول ديناميكيًا -->
+                            <div id="student-sunday-schedule" class="min-h-[200px]"></div>
+                            <div id="student-monday-schedule" class="min-h-[200px]"></div>
+                            <div id="student-tuesday-schedule" class="min-h-[200px]"></div>
+                            <div id="student-wednesday-schedule" class="min-h-[200px]"></div>
+                            <div id="student-thursday-schedule" class="min-h-[200px]"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- قسم جدول الامتحانات للطالب -->
+                <div id="student-exams" class="student-section hidden">
+                    <h2 class="text-xl font-bold mb-4">جدول الامتحانات</h2>
+                    <div class="card p-4 rounded-lg">
+                        <div class="overflow-x-auto">
+                            <table class="w-full table-auto border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-100 dark:bg-gray-700">
+                                        <th class="px-4 py-2 text-right">المادة</th>
+                                        <th class="px-4 py-2 text-right">التاريخ</th>
+                                        <th class="px-4 py-2 text-right">الوقت</th>
+                                        <th class="px-4 py-2 text-right">القاعة</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="student-exams-list">
+                                    <!-- سيتم ملء هذا الجدول ديناميكيًا -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- قسم التقدم الدراسي للطالب -->
+                <div id="student-progress" class="student-section hidden">
+                    <h2 class="text-xl font-bold mb-4">تقدمي الدراسي</h2>
+                    <div class="card p-4 rounded-lg">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="text-center">
+                                <div class="text-lg mb-1">الأرصدة المكتسبة</div>
+                                <div id="earned-credits" class="text-3xl font-bold text-primary">0</div>
+                                <div class="text-sm opacity-75">من أصل 30</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-lg mb-1">المعدل العام</div>
+                                <div id="progress-average" class="text-3xl font-bold"></div>
+                                <div class="text-sm opacity-75">من 20</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-lg mb-1">الحالة</div>
+                                <div id="student-status" class="text-3xl font-bold"></div>
+                                <div class="text-sm opacity-75" id="student-status-detail"></div>
+                            </div>
+                        </div>
+
+                        <div class="mt-8">
+                            <h3 class="font-bold mb-3">تفاصيل المواد</h3>
+                            <div class="overflow-x-auto">
+                                <table class="w-full table-auto border-collapse">
+                                    <thead>
+                                        <tr class="bg-gray-100 dark:bg-gray-700">
+                                            <th class="px-4 py-2 text-right">المادة</th>
+                                            <th class="px-4 py-2 text-right">الرمز</th>
+                                            <th class="px-4 py-2 text-right">المعدل</th>
+                                            <th class="px-4 py-2 text-right">الأرصدة المتاحة</th>
+                                            <th class="px-4 py-2 text-right">الأرصدة المكتسبة</th>
+                                            <th class="px-4 py-2 text-right">الحالة</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="courses-progress-list">
+                                        <!-- سيتم ملء هذا الجدول ديناميكيًا -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- قسم بطاقة الطالب -->
+                <div id="student-profile" class="student-section hidden">
+                    <h2 class="text-xl font-bold mb-4">بطاقة الطالب</h2>
+                    <div class="card p-4 rounded-lg">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h3 class="font-bold mb-3">المعلومات الشخصية</h3>
+                                <div class="grid grid-cols-1 gap-4">
+                                    <div>
+                                        <div class="text-sm opacity-75">الاسم الكامل</div>
+                                        <div id="profile-full-name" class="font-semibold"></div>
+                                    </div>
+                                    <div>
+                                        <div class="text-sm opacity-75">رقم التسجيل</div>
+                                        <div id="profile-reg-number" class="font-semibold"></div>
+                                    </div>
+                                    <div>
+                                        <div class="text-sm opacity-75">اسم المستخدم</div>
+                                        <div id="profile-username" class="font-semibold"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 class="font-bold mb-3">ملخص النتائج</h3>
+                                <div class="grid grid-cols-1 gap-4">
+                                    <div>
+                                        <div class="text-sm opacity-75">المعدل العام</div>
+                                        <div id="profile-average" class="font-semibold"></div>
+                                    </div>
+                                    <div>
+                                        <div class="text-sm opacity-75">الأرصدة المكتسبة</div>
+                                        <div id="profile-credits" class="font-semibold"></div>
+                                    </div>
+                                    <div>
+                                        <div class="text-sm opacity-75">الحالة</div>
+                                        <div id="profile-status" class="font-semibold"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-6">
+                            <button id="export-student-card" class="px-3 py-1 bg-primary text-white rounded-md hover:bg-opacity-90 transition-all">تصدير بطاقة الطالب إلى PDF</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- حامل الملف للتصدير -->
+        <div id="pdf-container" class="hidden">
+            <div id="pdf-content"></div>
+        </div>
+    </div>
+
+    <script>
+        // كشف وضع الألوان المظلم
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+
+        // استيراد مكتبات PDF
+        const { jsPDF } = window.jspdf;
+
+        // بيانات المستخدمين الافتراضية
+        const defaultUsers = {
+            'admin': {
+                username: 'admin',
+                password: 'admin',
+                role: 'admin',
+                firstName: 'المدير',
+                lastName: 'العام'
+            },
+            'd.rouis': {
+                username: 'd.rouis',
+                password: 'd.rouis',
+                role: 'teacher',
+                firstName: 'دليلة(أستاذ باحث درجة ب)',
+                lastName: 'رويس'
+            },
+            'm.zaradiah': {
+                username: 'm.zaradiah',
+                password: 'm.zaradiah',
+                role: 'teacher',
+                firstName: 'مليكة',
+                lastName: 'زراديه'
+            },
+            's.aouadja': {
+                username: 's.aouadja',
+                password: 's.aouadja',
+                role: 'teacher',
+                firstName: 'سليمة',
+                lastName: 'عواجة'
+            },
+            'm.matina': {
+                username: 'm.matina',
+                password: 'm.matina',
+                role: 'teacher',
+                firstName: 'مسحوق',
+                lastName: 'ماتينا'
+            },
+            'i.samouhi': {
+                username: 'i.samouhi',
+                password: 'i.samouhi',
+                role: 'teacher',
+                firstName: 'إبتسام',
+                lastName: 'صموحي'
+            },
+            's.frnaci': {
+                username: 's.frnaci',
+                password: 's.frnaci',
+                role: 'teacher',
+                firstName: 'سمير',
+                lastName: 'فرناسي'
+            },
+            'd.boudejra': {
+                username: 'd.boudejra',
+                password: 'd.boudejra',
+                role: 'teacher',
+                firstName: 'دليلة',
+                lastName: 'بودجرة'
+            },
+            'd.boukhimar': {
+                username: 'd.boukhimar',
+                password: 'd.boukhimar',
+                role: 'teacher',
+                firstName: 'دنيوية',
+                lastName: 'بوخمار'
+            },
+            's.bouguern': {
+                username: 's.bouguern',
+                password: 's.bouguern',
+                role: 'student',
+                firstName: 'ستيف',
+                lastName: 'بوقرن',
+                regNumber: '202301001'
+            },
+            'j.bouguern': {
+                username: 'j.bouguern',
+                password: 'j.bouguern',
+                role: 'student',
+                firstName: 'جيما',
+                lastName: 'بوقرن',
+                regNumber: '202301002'
+            },
+            'si.bouguern': {
+                username: 'si.bouguern',
+                password: 'si.bouguern',
+                role: 'student',
+                firstName: 'سيرا',
+                lastName: 'بوقرن',
+                regNumber: '202301003'
+            },
+            'g.bouguern': {
+                username: 'g.bouguern',
+                password: 'g.bouguern',
+                role: 'student',
+                firstName: 'قيبا',
+                lastName: 'بوقرن',
+                regNumber: '202301004'
+            },
+            'a.benoud': {
+                username: 'a.benoud',
+                password: 'a.benoud',
+                role: 'student',
+                firstName: 'علي',
+                lastName: 'بنود',
+                regNumber: '202301005'
+            },
+            'r.gharabia': {
+                username: 'r.gharabia',
+                password: 'r.gharabia',
+                role: 'student',
+                firstName: 'رشيد',
+                lastName: 'غرابية',
+                regNumber: '202301006'
+            },
+            'k.bashih': {
+                username: 'k.bashih',
+                password: 'k.bashih',
+                role: 'student',
+                firstName: 'كريم',
+                lastName: 'باشيح',
+                regNumber: '202301007'
+            },
+            'n.boutram': {
+                username: 'n.boutram',
+                password: 'n.boutram',
+                role: 'student',
+                firstName: 'نبيل',
+                lastName: 'بوطرام',
+                regNumber: '202301008'
+            }
+        };
+
+        // بيانات تجريبية
+        const defaultCourses = [
+            {
+                id: 'course1',
+                name: 'رياضيات',
+                code: 'MATH101',
+                credits: 6,
+                components: {
+                    hasTD: true,
+                    hasTP: true,
+                    hasExam: true
+                },
+                teachers: {
+                    lecture: 'd.boudejra',
+                    td: 'd.boudejra',
+                    tp: 'd.boudejra'
+                }
+            },
+            {
+                id: 'course2',
+                name: 'فيزياء',
+                code: 'PHYS101',
+                credits: 5,
+                components: {
+                    hasTD: true,
+                    hasTP: true,
+                    hasExam: true
+                },
+                teachers: {
+                    lecture: 'd.boudejra',
+                    td: 'd.boudejra',
+                    tp: 'd.boudejra'
+                }
+            },
+            {
+                id: 'course3',
+                name: 'إعلام آلي',
+                code: 'INFO101',
+                credits: 4,
+                components: {
+                    hasTD: false,
+                    hasTP: true,
+                    hasExam: true
+                },
+                teachers: {
+                    lecture: 'd.boudejra',
+                    tp: 'd.boudejra'
+                }
+            },
+            {
+                id: 'course4',
+                name: 'لغة انجليزية',
+                code: 'ENG101',
+                credits: 2,
+                components: {
+                    hasTD: true,
+                    hasTP: false,
+                    hasExam: true
+                },
+                teachers: {
+                    lecture: 'm.matina',
+                    td: 'm.matina'
+                }
+            },
+ {
+                id: 'course6',
+                name: 'أدب عربي',
+                code: 'ARB101',
+                credits: 2,
+                components: {
+                    hasTD: true,
+                    hasTP: false,
+                    hasExam: true
+                },
+                teachers: {
+                    lecture: 'i.samouhi',
+                    td: 'i.samouhi'
+                }
+            },
+            {
+                id: 'course7',
+                name: 'التاريخ والجغرافيا',
+                code: 'HIGE101',
+                credits: 3,
+                components: {
+                    hasTD: true,
+                    hasTP: false,
+                    hasExam: true
+                },
+                teachers: {
+                    lecture: 's.aouadja',
+                    td: 's.aouadja'
+                }
+            },
+             {
+                id: 'course8',
+                name: 'اللغة الفرنسية',
+                code: 'FRC101',
+                credits: 2,
+                components: {
+                    hasTD: true,
+                    hasTP: false,
+                    hasExam: true
+                },
+                teachers: {
+                    lecture: 'd.boudejra',
+                    td: 'd.boudejra'
+                }
+            },
+               {
+                id: 'course9',
+                name: 'العلوم الإسلامية',
+                code: 'FRC101',
+                credits: 2,
+                components: {
+                    hasTD: true,
+                    hasTP: false,
+                    hasExam: true
+                },
+                teachers: {
+                    lecture: 'i.samouhi',
+                    td: 'i.samouhi'
+                }
+            },
+                 {
+                id: 'course10',
+                name: 'العلوم ',
+                code: 'SNV101',
+                credits: 4,
+                components: {
+                    hasTD: true,
+                    hasTP: false,
+                    hasExam: true
+                },
+                teachers: {
+                    lecture: 'm.zaradiah',
+                    td: 'm.zaradiah'
+                }
+            },
+                 {
+                id: 'course11',
+                name: 'مدخل لعلم الإحصاء ',
+                code: 'PBST101',
+                credits: 4,
+                components: {
+                    hasTD: true,
+                    hasTP: false,
+                    hasExam: true
+                },
+                teachers: {
+                    lecture: 'd.boudejra',
+                    td: 'd.boudejra'
+                }
+            },
+        ];
+
+        // بيانات جدول الحصص والامتحانات
+        const defaultSchedules = [
+            {
+                id: 'schedule1',
+                courseId: 'course1',
+                type: 'lecture',
+                day: 'sunday',
+                startTime: '08:00',
+                endTime: '09:30',
+                room: 'A101'
+            },
+            {
+                id: 'schedule2',
+                courseId: 'course1',
+                type: 'td',
+                day: 'monday',
+                startTime: '10:00',
+                endTime: '11:30',
+                room: 'B203'
+            },
+            {
+                id: 'schedule3',
+                courseId: 'course1',
+                type: 'tp',
+                day: 'wednesday',
+                startTime: '14:00',
+                endTime: '16:00',
+                room: 'TP101'
+            },
+            {
+                id: 'schedule4',
+                courseId: 'course2',
+                type: 'lecture',
+                day: 'monday',
+                startTime: '08:00',
+                endTime: '09:30',
+                room: 'A102'
+            },
+            {
+                id: 'schedule5',
+                courseId: 'course3',
+                type: 'lecture',
+                day: 'tuesday',
+                startTime: '13:00',
+                endTime: '14:30',
+                room: 'INFO-LAB'
+            },
+            {
+                id: 'schedule6',
+                courseId: 'course4',
+                type: 'lecture',
+                day: 'thursday',
+                startTime: '10:00',
+                endTime: '11:30',
+                room: 'E304'
+            }
+        ];
+
+        const defaultExams = [
+            {
+                id: 'exam1',
+                courseId: 'course1',
+                date: '2020-04-20',
+                startTime: '09:00',
+                endTime: '10:30',
+                room: 'AMPH-A'
+            },
+            {
+                id: 'exam2',
+                courseId: 'course2',
+                date: '2020-12-22',
+                startTime: '09:00',
+                endTime: '10:30',
+                room: 'AMPH-B'
+            },
+            {
+                id: 'exam3',
+                courseId: 'course3',
+                date: '2020-12-24',
+                startTime: '13:00',
+                endTime: '14:30',
+                room: 'AMPH-C'
+            },
+            {
+                id: 'exam4',
+                courseId: 'course4',
+                date: '2020-12-26',
+                startTime: '09:00',
+                endTime: '10:30',
+                room: 'AMPH-A'
+            }
+        ];
+
+        // بيانات العلامات التجريبية
+        const defaultGrades = {
+            's.bouguern': {
+                'course1': {
+                    td: 0,
+                    tp:0,
+                    exam: 0
+                },
+                'course2': {
+                    td: 0,
+                    tp: 0,
+                    exam: 0
+                },
+                'course3': {
+                    tp: 0,
+                    exam: 0
+                },
+                'course4': {
+                    td: 0,
+                    exam: 0
+                }
+            },
+            'j.bouguern': {
+                'course1': {
+                    td: 0,
+                    tp: 0,
+                    exam: 0
+                },
+                'course2': {
+                    td: 0,
+                    tp: 0,
+                    exam: 0
+                },
+                'course3': {
+                    tp: 0,
+                    exam: 0
+                },
+                'course4': {
+                    td: 0,
+                    exam: 0
+                }
+            },
+              'g.bouguern': {
+                'course1': {
+                    td: 0,
+                    tp: 0,
+                    exam: 0
+                },
+                'course2': {
+                    td: 0,
+                    tp: 0,
+                    exam:0
+                },
+                'course3': {
+                    tp: 0,
+                    exam: 0
+                },
+                'course4': {
+                    td: 0,
+                    exam: 0
+                }
+            },
+                'si.bouguern': {
+                'course1': {
+                    td: 0,
+                    tp: 0,
+                    exam: 0
+                },
+                'course2': {
+                    td: 0,
+                    tp: 0,
+                    exam: 0
+                },
+                'course3': {
+                    tp: 0,
+                    exam: 0
+                },
+                'course4': {
+                    td: 0,
+                    exam: 0
+                }
+            },
+               'a.benoud': {
+                'course1': {
+                    td: 0 ,
+                    tp: 0,
+                    exam: 0
+                },
+                'course2': {
+                    td: 0,
+                    tp: 0,
+                    exam: 0
+                },
+                'course3': {
+                    tp: 0,
+                    exam: 0
+                },
+                'course4': {
+                    td: 0,
+                    exam: 0
+                }
+            }
+        };
+
+        // تهيئة بيانات النظام
+        function initializeData() {
+            if (!localStorage.getItem('users')) {
+                localStorage.setItem('users', JSON.stringify(defaultUsers));
+            }
+            
+            if (!localStorage.getItem('courses')) {
+                localStorage.setItem('courses', JSON.stringify(defaultCourses));
+            }
+            
+            if (!localStorage.getItem('schedules')) {
+                localStorage.setItem('schedules', JSON.stringify(defaultSchedules));
+            }
+            
+            if (!localStorage.getItem('exams')) {
+                localStorage.setItem('exams', JSON.stringify(defaultExams));
+            }
+            
+            if (!localStorage.getItem('grades')) {
+                localStorage.setItem('grades', JSON.stringify(defaultGrades));
+            }
+            
+            if (!localStorage.getItem('notifications')) {
+                localStorage.setItem('notifications', JSON.stringify({}));
+            }
+        }
+
+        // دوال مساعدة
+        function getUserByUsername(username) {
+            const users = JSON.parse(localStorage.getItem('users'));
+            return users[username];
+        }
+
+        function getAllUsers(role = null) {
+            const users = JSON.parse(localStorage.getItem('users'));
+            if (role) {
+                const filteredUsers = {};
+                for (const username in users) {
+                    if (users[username].role === role) {
+                        filteredUsers[username] = users[username];
+                    }
+                }
+                return filteredUsers;
+            }
+            return users;
+        }
+
+        function getCourseById(courseId) {
+            const courses = JSON.parse(localStorage.getItem('courses'));
+            return courses.find(course => course.id === courseId);
+        }
+
+        function getCoursesByTeacher(teacherUsername) {
+            const courses = JSON.parse(localStorage.getItem('courses'));
+            return courses.filter(course => {
+                return course.teachers.lecture === teacherUsername || 
+                       course.teachers.td === teacherUsername || 
+                       course.teachers.tp === teacherUsername;
+            });
+        }
+
+        function getSchedulesByCourse(courseId) {
+            const schedules = JSON.parse(localStorage.getItem('schedules'));
+            return schedules.filter(schedule => schedule.courseId === courseId);
+        }
+
+        function getSchedulesByTeacher(teacherUsername) {
+            const courses = getCoursesByTeacher(teacherUsername);
+            const schedules = JSON.parse(localStorage.getItem('schedules'));
+            
+            const teacherSchedules = [];
+            
+            for (const course of courses) {
+                const courseSchedules = schedules.filter(schedule => schedule.courseId === course.id);
+                for (const schedule of courseSchedules) {
+                    const teacherType = Object.keys(course.teachers).find(key => course.teachers[key] === teacherUsername);
+                    
+                    if (schedule.type === 'lecture' && course.teachers.lecture === teacherUsername) {
+                        teacherSchedules.push({...schedule, course: course});
+                    } else if (schedule.type === 'td' && course.teachers.td === teacherUsername) {
+                        teacherSchedules.push({...schedule, course: course});
+                    } else if (schedule.type === 'tp' && course.teachers.tp === teacherUsername) {
+                        teacherSchedules.push({...schedule, course: course});
+                    }
+                }
+            }
+            
+            return teacherSchedules;
+        }
+
+        function getExamsByTeacher(teacherUsername) {
+            const courses = getCoursesByTeacher(teacherUsername);
+            const exams = JSON.parse(localStorage.getItem('exams'));
+            
+            const teacherExams = [];
+            
+            for (const course of courses) {
+                const courseExams = exams.filter(exam => exam.courseId === course.id);
+                for (const exam of courseExams) {
+                    teacherExams.push({...exam, course: course});
+                }
+            }
+            
+            return teacherExams;
+        }
+
+        function calculateCourseAverage(courseGrades, course) {
+            if (!courseGrades) return null;
+
+            let average = 0;
+            let weights = 0;
+
+            if (course.components.hasTD && courseGrades.td !== undefined) {
+                average += courseGrades.td * 0.2;
+                weights += 0.2;
+            }
+
+            if (course.components.hasTP && courseGrades.tp !== undefined) {
+                average += courseGrades.tp * 0.2;
+                weights += 0.2;
+            }
+
+            if (course.components.hasExam && courseGrades.exam !== undefined) {
+                average += courseGrades.exam * (1 - weights);
+            } else {
+                // إذا لم يكن هناك امتحان، نعيد توزيع الأوزان
+                if (weights > 0) {
+                    average = average / weights;
+                }
+                return average;
+            }
+
+            return average;
+        }
+
+        function calculateOverallAverage(studentUsername) {
+            const grades = JSON.parse(localStorage.getItem('grades'));
+            const courses = JSON.parse(localStorage.getItem('courses'));
+            
+            if (!grades[studentUsername]) return null;
+            
+            const studentGrades = grades[studentUsername];
+            let totalWeightedGrade = 0;
+            let totalCredits = 0;
+            
+            for (const courseId in studentGrades) {
+                const course = courses.find(c => c.id === courseId);
+                if (course) {
+                    const courseAverage = calculateCourseAverage(studentGrades[courseId], course);
+                    if (courseAverage !== null) {
+                        totalWeightedGrade += courseAverage * course.credits;
+                        totalCredits += course.credits;
+                    }
+                }
+            }
+            
+            if (totalCredits === 0) return null;
+            
+            return totalWeightedGrade / totalCredits;
+        }
+
+        function calculateCredits(studentUsername) {
+            const grades = JSON.parse(localStorage.getItem('grades'));
+            const courses = JSON.parse(localStorage.getItem('courses'));
+            
+            if (!grades[studentUsername]) return 0;
+            
+            const studentGrades = grades[studentUsername];
+            let totalCredits = 0;
+            
+            for (const courseId in studentGrades) {
+                const course = courses.find(c => c.id === courseId);
+                if (course) {
+                    const courseAverage = calculateCourseAverage(studentGrades[courseId], course);
+                    if (courseAverage !== null && courseAverage >= 10) {
+                        totalCredits += course.credits;
+                    }
+                }
+            }
+            
+            // التحقق من المعدل العام
+            const overallAverage = calculateOverallAverage(studentUsername);
+            if (overallAverage !== null && overallAverage >= 10) {
+                return 30; // إذا كان المعدل العام فوق 10، يحصل على 30 رصيد تلقائيا
+            }
+            
+            return totalCredits;
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('ar-DZ', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+
+        function translateDay(day) {
+            const days = {
+                'sunday': 'الأحد',
+                'monday': 'الإثنين',
+                'tuesday': 'الثلاثاء',
+                'wednesday': 'الأربعاء',
+                'thursday': 'الخميس'
+            };
+            return days[day] || day;
+        }
+
+        function translateType(type) {
+            const types = {
+                'lecture': 'محاضرة',
+                'td': 'أعمال توجيهية',
+                'tp': 'أعمال تطبيقية'
+            };
+            return types[type] || type;
+        }
+
+        function formatTime(timeString) {
+            return timeString;
+        }
+
+        // دوال PDF
+        function generatePDF(contentId, filename, options = {}) {
+            const { orientation = 'portrait', title = '' } = options;
+            
+            const content = document.getElementById(contentId);
+            const contentClone = content.cloneNode(true);
+            
+            // إنشاء العنوان
+            if (title) {
+                const titleElement = document.createElement('h1');
+                titleElement.textContent = title;
+                titleElement.style.textAlign = 'center';
+                titleElement.style.fontSize = '24px';
+                titleElement.style.marginBottom = '20px';
+                
+                contentClone.insertBefore(titleElement, contentClone.firstChild);
+            }
+            
+            // إضافة تذييل
+            const footer = document.createElement('div');
+            footer.classList.add('pdf-footer');
+            footer.textContent = `تم إنشاء هذا المستند بتاريخ ${new Date().toLocaleDateString('ar-DZ')}`;
+            contentClone.appendChild(footer);
+            
+            document.getElementById('pdf-content').innerHTML = '';
+            document.getElementById('pdf-content').appendChild(contentClone);
+            
+            html2canvas(document.getElementById('pdf-content'), {
+                scale: 2
+            }).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF(orientation, 'mm', 'a4');
+                
+                const imgWidth = orientation === 'portrait' ? 190 : 277;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                
+                pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+                pdf.save(filename);
+                
+                document.getElementById('pdf-content').innerHTML = '';
+            });
+        }
+
+        // تصدير إلى Excel
+        function exportToExcel(data, sheetName, fileName) {
+            const ws = XLSX.utils.json_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            XLSX.writeFile(wb, fileName);
+        }
+
+        // استيراد من Excel
+        function importFromExcel(file, callback) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = e.target.result;
+                const workbook = XLSX.read(data, { type: 'binary' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const json = XLSX.utils.sheet_to_json(worksheet);
+                callback(json);
+            };
+            reader.readAsBinaryString(file);
+        }
+
+        // دالة تسجيل الدخول
+        function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorMessage = document.getElementById('error-message');
+            
+            const users = JSON.parse(localStorage.getItem('users'));
+            
+            if (users[username] && users[username].password === password) {
+                const user = users[username];
+                localStorage.setItem('currentUser', JSON.stringify(user));
+                
+                document.getElementById('login-screen').classList.add('hidden');
+                
+                if (user.role === 'admin') {
+                    document.getElementById('admin-dashboard').classList.remove('hidden');
+                    document.getElementById('admin-name').textContent = `${user.firstName} ${user.lastName}`;
+                    loadAdminDashboard();
+                } else if (user.role === 'teacher') {
+                    document.getElementById('teacher-dashboard').classList.remove('hidden');
+                    document.getElementById('teacher-name').textContent = `${user.firstName} ${user.lastName}`;
+                    loadTeacherDashboard();
+                } else if (user.role === 'student') {
+                    document.getElementById('student-dashboard').classList.remove('hidden');
+                    document.getElementById('student-name').textContent = `${user.firstName} ${user.lastName}`;
+                    loadStudentDashboard();
+                }
+                
+                errorMessage.classList.add('hidden');
+            } else {
+                errorMessage.textContent = 'اسم المستخدم أو كلمة المرور غير صحيحة';
+                errorMessage.classList.remove('hidden');
+            }
+        }
+
+        // دالة تسجيل الخروج
+        function logout() {
+            localStorage.removeItem('currentUser');
+            document.getElementById('admin-dashboard').classList.add('hidden');
+            document.getElementById('teacher-dashboard').classList.add('hidden');
+            document.getElementById('student-dashboard').classList.add('hidden');
+            document.getElementById('login-screen').classList.remove('hidden');
+            
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        }
+
+        // تحميل بيانات لوحة تحكم المدير
+        function loadAdminDashboard() {
+            // عرض القسم الافتراضي
+            document.querySelectorAll('.admin-section').forEach(section => {
+                section.classList.add('hidden');
+            });
+            document.getElementById('manage-teachers').classList.remove('hidden');
+            
+            // تحميل قائمة الأساتذة
+            loadTeachersList();
+            
+            // تحميل قائمة الطلبة
+            loadStudentsList();
+            
+            // تحميل قائمة المواد
+            loadCoursesList();
+            
+            // تحميل جداول الحصص والامتحانات
+            loadSchedulesList();
+            loadExamsList();
+            
+            // تحميل قوائم المواد في الجداول
+            loadCoursesInSelects();
+        }
+
+        // تحميل قائمة الأساتذة
+        function loadTeachersList() {
+            const teachersList = document.getElementById('teachers-list');
+            teachersList.innerHTML = '';
+            
+            const teachers = getAllUsers('teacher');
+            
+            for (const username in teachers) {
+                const teacher = teachers[username];
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td class="px-4 py-2 border-t">${teacher.username}</td>
+                    <td class="px-4 py-2 border-t">${teacher.firstName}</td>
+                    <td class="px-4 py-2 border-t">${teacher.lastName}</td>
+                    <td class="px-4 py-2 border-t">
+                        <button class="delete-teacher px-2 py-1 bg-red-500 text-white rounded-md hover:bg-opacity-90 transition-all" data-username="${teacher.username}">حذف</button>
+                    </td>
+                `;
+                
+                teachersList.appendChild(row);
+            }
+            
+            // إضافة مستمعي الأحداث لأزرار الحذف
+            document.querySelectorAll('.delete-teacher').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const username = this.getAttribute('data-username');
+                    deleteTeacher(username);
+                });
+            });
+        }
+
+        // إضافة أستاذ جديد
+        function addTeacher() {
+            const username = document.getElementById('new-teacher-username').value;
+            const firstName = document.getElementById('new-teacher-firstname').value;
+            const lastName = document.getElementById('new-teacher-lastname').value;
+            
+            if (!username || !firstName || !lastName) {
+                alert('الرجاء ملء جميع الحقول المطلوبة');
+                return;
+            }
+            
+            const users = JSON.parse(localStorage.getItem('users'));
+            
+            if (users[username]) {
+                alert('اسم المستخدم موجود بالفعل');
+                return;
+            }
+            
+            users[username] = {
+                username: username,
+                password: username, // كلمة المرور الافتراضية هي اسم المستخدم نفسه
+                role: 'teacher',
+                firstName: firstName,
+                lastName: lastName
+            };
+            
+            localStorage.setItem('users', JSON.stringify(users));
+            
+            // إعادة تحميل قائمة الأساتذة
+            loadTeachersList();
+            
+            // مسح حقول الإدخال
+            document.getElementById('new-teacher-username').value = '';
+            document.getElementById('new-teacher-firstname').value = '';
+            document.getElementById('new-teacher-lastname').value = '';
+        }
+
+        // حذف أستاذ
+        function deleteTeacher(username) {
+            if (confirm(`هل أنت متأكد من حذف الأستاذ ${username}؟`)) {
+                const users = JSON.parse(localStorage.getItem('users'));
+                
+                delete users[username];
+                
+                localStorage.setItem('users', JSON.stringify(users));
+                
+                // إعادة تحميل قائمة الأساتذة
+                loadTeachersList();
+            }
+        }
+
+        // تحميل قائمة الطلبة
+        function loadStudentsList() {
+            const studentsList = document.getElementById('students-list');
+            studentsList.innerHTML = '';
+            
+            const students = getAllUsers('student');
+            
+            for (const username in students) {
+                const student = students[username];
+                const overallAverage = calculateOverallAverage(username);
+                const creditsEarned = calculateCredits(username);
+                
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td class="px-4 py-2 border-t">${student.username}</td>
+                    <td class="px-4 py-2 border-t">${student.firstName}</td>
+                    <td class="px-4 py-2 border-t">${student.lastName}</td>
+                    <td class="px-4 py-2 border-t">${student.regNumber}</td>
+                    <td class="px-4 py-2 border-t ${overallAverage >= 10 ? 'text-green-600' : 'text-red-600'}">${overallAverage ? overallAverage.toFixed(2) : '-'}</td>
+                    <td class="px-4 py-2 border-t">${creditsEarned} / 30</td>
+                    <td class="px-4 py-2 border-t">
+                        <button class="delete-student px-2 py-1 bg-red-500 text-white rounded-md hover:bg-opacity-90 transition-all" data-username="${student.username}">حذف</button>
+                    </td>
+                `;
+                
+                studentsList.appendChild(row);
+            }
+            
+            // إضافة مستمعي الأحداث لأزرار الحذف
+            document.querySelectorAll('.delete-student').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const username = this.getAttribute('data-username');
+                    deleteStudent(username);
+                });
+            });
+        }
+
+        // إضافة طالب جديد
+        function addStudent() {
+            const username = document.getElementById('new-student-username').value;
+            const firstName = document.getElementById('new-student-firstname').value;
+            const lastName = document.getElementById('new-student-lastname').value;
+            const regNumber = document.getElementById('new-student-regnum').value;
+            
+            if (!username || !firstName || !lastName || !regNumber) {
+                alert('الرجاء ملء جميع الحقول المطلوبة');
+                return;
+            }
+            
+            const users = JSON.parse(localStorage.getItem('users'));
+            
+            if (users[username]) {
+                alert('اسم المستخدم موجود بالفعل');
+                return;
+            }
+            
+            users[username] = {
+                username: username,
+                password: username, // كلمة المرور الافتراضية هي اسم المستخدم نفسه
+                role: 'student',
+                firstName: firstName,
+                lastName: lastName,
+                regNumber: regNumber
+            };
+            
+            localStorage.setItem('users', JSON.stringify(users));
+            
+            // إعادة تحميل قائمة الطلبة
+            loadStudentsList();
+            
+            // مسح حقول الإدخال
+            document.getElementById('new-student-username').value = '';
+            document.getElementById('new-student-firstname').value = '';
+            document.getElementById('new-student-lastname').value = '';
+            document.getElementById('new-student-regnum').value = '';
+        }
+
+        // حذف طالب
+        function deleteStudent(username) {
+            if (confirm(`هل أنت متأكد من حذف الطالب ${username}؟`)) {
+                const users = JSON.parse(localStorage.getItem('users'));
+                const grades = JSON.parse(localStorage.getItem('grades'));
+                
+                delete users[username];
+                delete grades[username];
+                
+                localStorage.setItem('users', JSON.stringify(users));
+                localStorage.setItem('grades', JSON.stringify(grades));
+                
+                // إعادة تحميل قائمة الطلبة
+                loadStudentsList();
+            }
+        }
+
+        // تحميل قائمة المواد
+        function loadCoursesList() {
+            const coursesList = document.getElementById('courses-list');
+            coursesList.innerHTML = '';
+            
+            const courses = JSON.parse(localStorage.getItem('courses'));
+            const teachers = getAllUsers('teacher');
+            
+            for (const course of courses) {
+                const row = document.createElement('tr');
+                
+                // تحضير قائمة المكونات
+                const components = [];
+                if (course.components.hasTD) components.push('أعمال توجيهية');
+                if (course.components.hasTP) components.push('أعمال تطبيقية');
+                if (course.components.hasExam) components.push('امتحان');
+                
+                // تحضير قائمة الأساتذة المخصصين
+                const assignedTeachers = [];
+                if (course.teachers.lecture) {
+                    const teacher = teachers[course.teachers.lecture];
+                    if (teacher) assignedTeachers.push(`محاضرة: ${teacher.firstName} ${teacher.lastName}`);
+                }
+                if (course.components.hasTD && course.teachers.td) {
+                    const teacher = teachers[course.teachers.td];
+                    if (teacher) assignedTeachers.push(`أعمال توجيهية: ${teacher.firstName} ${teacher.lastName}`);
+                }
+                if (course.components.hasTP && course.teachers.tp) {
+                    const teacher = teachers[course.teachers.tp];
+                    if (teacher) assignedTeachers.push(`أعمال تطبيقية: ${teacher.firstName} ${teacher.lastName}`);
+                }
+                
+                row.innerHTML = `
+                    <td class="px-4 py-2 border-t">${course.name}</td>
+                    <td class="px-4 py-2 border-t">${course.code}</td>
+                    <td class="px-4 py-2 border-t">${course.credits}</td>
+                    <td class="px-4 py-2 border-t">${components.join(', ') || 'لا يوجد'}</td>
+                    <td class="px-4 py-2 border-t">
+                        <button class="assign-teachers px-2 py-1 bg-primary text-white rounded-md hover:bg-opacity-90 transition-all mb-2" data-course-id="${course.id}">تخصيص الأساتذة</button>
+                        <div>${assignedTeachers.join('<br>') || 'لا يوجد'}</div>
+                    </td>
+                    <td class="px-4 py-2 border-t">
+                        <button class="delete-course px-2 py-1 bg-red-500 text-white rounded-md hover:bg-opacity-90 transition-all" data-course-id="${course.id}">حذف</button>
+                    </td>
+                `;
+                
+                coursesList.appendChild(row);
+            }
+            
+            // إضافة مستمعي الأحداث
+            document.querySelectorAll('.delete-course').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const courseId = this.getAttribute('data-course-id');
+                    deleteCourse(courseId);
+                });
+            });
+            
+            document.querySelectorAll('.assign-teachers').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const courseId = this.getAttribute('data-course-id');
+                    showAssignTeachersModal(courseId);
+                });
+            });
+        }
+
+        // إضافة مادة جديدة
+        function addCourse() {
+            const name = document.getElementById('new-course-name').value;
+            const code = document.getElementById('new-course-code').value;
+            const credits = parseInt(document.getElementById('new-course-credits').value);
+            const hasTD = document.getElementById('new-course-has-td').checked;
+            const hasTP = document.getElementById('new-course-has-tp').checked;
+            const hasExam = document.getElementById('new-course-has-exam').checked;
+            
+            if (!name || !code || isNaN(credits)) {
+                alert('الرجاء ملء جميع الحقول المطلوبة');
+                return;
+            }
+            
+            const courses = JSON.parse(localStorage.getItem('courses'));
+            
+            // إنشاء معرف فريد للمادة
+            const courseId = 'course' + (courses.length + 1);
+            
+            const newCourse = {
+                id: courseId,
+                name: name,
+                code: code,
+                credits: credits,
+                components: {
+                    hasTD: hasTD,
+                    hasTP: hasTP,
+                    hasExam: hasExam
+                },
+                teachers: {}
+            };
+            
+            courses.push(newCourse);
+            
+            localStorage.setItem('courses', JSON.stringify(courses));
+            
+            // إعادة تحميل قائمة المواد
+            loadCoursesList();
+            
+            // إعادة تحميل قوائم المواد في الجداول
+            loadCoursesInSelects();
+            
+            // مسح حقول الإدخال
+            document.getElementById('new-course-name').value = '';
+            document.getElementById('new-course-code').value = '';
+            document.getElementById('new-course-credits').value = '1';
+            document.getElementById('new-course-has-td').checked = false;
+            document.getElementById('new-course-has-tp').checked = false;
+            document.getElementById('new-course-has-exam').checked = true;
+        }
+
+        // حذف مادة
+        function deleteCourse(courseId) {
+            if (confirm('هل أنت متأكد من حذف هذه المادة؟')) {
+                const courses = JSON.parse(localStorage.getItem('courses'));
+                const schedules = JSON.parse(localStorage.getItem('schedules'));
+                const exams = JSON.parse(localStorage.getItem('exams'));
+                const grades = JSON.parse(localStorage.getItem('grades'));
+                
+                // حذف المادة
+                const updatedCourses = courses.filter(course => course.id !== courseId);
+                
+                // حذف جداول الحصص والامتحانات المرتبطة
+                const updatedSchedules = schedules.filter(schedule => schedule.courseId !== courseId);
+                const updatedExams = exams.filter(exam => exam.courseId !== courseId);
+                
+                // حذف العلامات المرتبطة
+                for (const studentUsername in grades) {
+                    if (grades[studentUsername][courseId]) {
+                        delete grades[studentUsername][courseId];
+                    }
+                }
+                
+                localStorage.setItem('courses', JSON.stringify(updatedCourses));
+                localStorage.setItem('schedules', JSON.stringify(updatedSchedules));
+                localStorage.setItem('exams', JSON.stringify(updatedExams));
+                localStorage.setItem('grades', JSON.stringify(grades));
+                
+                // إعادة تحميل القوائم
+                loadCoursesList();
+                loadSchedulesList();
+                loadExamsList();
+                loadCoursesInSelects();
+            }
+        }
+
+        // إظهار نافذة تخصيص الأساتذة
+        function showAssignTeachersModal(courseId) {
+            const course = getCourseById(courseId);
+            const teachers = getAllUsers('teacher');
+            
+            // إنشاء النافذة المنبثقة
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            
+            // محتوى النافذة
+            modal.innerHTML = `
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold">تخصيص الأساتذة لمادة ${course.name}</h3>
+                        <button id="close-modal" class="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-gray-100">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-1">أستاذ المحاضرة</label>
+                        <select id="lecture-teacher" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                            <option value="">اختر أستاذ...</option>
+                            ${Object.keys(teachers).map(username => 
+                                `<option value="${username}" ${course.teachers.lecture === username ? 'selected' : ''}>${teachers[username].firstName} ${teachers[username].lastName}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                    
+                    ${course.components.hasTD ? `
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-1">أستاذ الأعمال التوجيهية</label>
+                            <select id="td-teacher" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                                <option value="">اختر أستاذ...</option>
+                                ${Object.keys(teachers).map(username => 
+                                    `<option value="${username}" ${course.teachers.td === username ? 'selected' : ''}>${teachers[username].firstName} ${teachers[username].lastName}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                    ` : ''}
+                    
+                    ${course.components.hasTP ? `
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-1">أستاذ الأعمال التطبيقية</label>
+                            <select id="tp-teacher" class="w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base">
+                                <option value="">اختر أستاذ...</option>
+                                ${Object.keys(teachers).map(username => 
+                                    `<option value="${username}" ${course.teachers.tp === username ? 'selected' : ''}>${teachers[username].firstName} ${teachers[username].lastName}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="flex justify-end">
+                        <button id="save-teachers" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-opacity-90 transition-all">حفظ</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // مستمعي الأحداث
+            document.getElementById('close-modal').addEventListener('click', function() {
+                document.body.removeChild(modal);
+            });
+            
+            document.getElementById('save-teachers').addEventListener('click', function() {
+                const lectureTeacher = document.getElementById('lecture-teacher').value;
+                const tdTeacher = course.components.hasTD ? document.getElementById('td-teacher').value : null;
+                const tpTeacher = course.components.hasTP ? document.getElementById('tp-teacher').value : null;
+                
+                // تحديث بيانات المادة
+                const courses = JSON.parse(localStorage.getItem('courses'));
+                const courseIndex = courses.findIndex(c => c.id === courseId);
+                
+                if (courseIndex !== -1) {
+                    courses[courseIndex].teachers = {
+                        lecture: lectureTeacher || null,
+                        td: tdTeacher || null,
+                        tp: tpTeacher || null
+                    };
+                    
+                    localStorage.setItem('courses', JSON.stringify(courses));
+                    
+                    // إرسال إشعار للأساتذة الجدد
+                    sendNotificationToTeachers(courseId, lectureTeacher, tdTeacher, tpTeacher);
+                    
+                    // إعادة تحميل قائمة المواد
+                    loadCoursesList();
+                }
+                
+                document.body.removeChild(modal);
+            });
+        }
+
+        // إرسال إشعار للأساتذة عند تخصيص مادة جديدة
+        function sendNotificationToTeachers(courseId, lectureTeacher, tdTeacher, tpTeacher) {
+            const course = getCourseById(courseId);
+            const notifications = JSON.parse(localStorage.getItem('notifications'));
+            
+            const teachers = [lectureTeacher, tdTeacher, tpTeacher].filter(Boolean);
+            
+            for (const teacher of teachers) {
+                if (!notifications[teacher]) {
+                    notifications[teacher] = [];
+                }
+                
+                const notificationType = [];
+                if (teacher === lectureTeacher) notificationType.push('محاضرة');
+                if (teacher === tdTeacher) notificationType.push('أعمال توجيهية');
+                if (teacher === tpTeacher) notificationType.push('أعمال تطبيقية');
+                
+                notifications[teacher].push({
+                    id: Date.now() + Math.random().toString(36).substr(2, 5),
+                    courseId: courseId,
+                    courseName: course.name,
+                    courseCode: course.code,
+                    type: notificationType.join(', '),
+                    date: new Date().toISOString(),
+                    read: false
+                });
+            }
+            
+            localStorage.setItem('notifications', JSON.stringify(notifications));
+        }
+
+        // تحميل قوائم المواد في الفورم
+        function loadCoursesInSelects() {
+            const courses = JSON.parse(localStorage.getItem('courses'));
+            
+            // تحميل قائمة المواد في فورم جدول الحصص
+            const scheduleCoursesSelect = document.getElementById('schedule-course');
+            scheduleCoursesSelect.innerHTML = '';
+            
+            courses.forEach(course => {
+                const option = document.createElement('option');
+                option.value = course.id;
+                option.textContent = `${course.name} (${course.code})`;
+                scheduleCoursesSelect.appendChild(option);
+            });
+            
+            // تحميل قائمة المواد في فورم جدول الامتحانات
+            const examCoursesSelect = document.getElementById('exam-course');
+            examCoursesSelect.innerHTML = '';
+            
+            courses.forEach(course => {
+                const option = document.createElement('option');
+                option.value = course.id;
+                option.textContent = `${course.name} (${course.code})`;
+                examCoursesSelect.appendChild(option);
+            });
+        }
+
+        // تحميل قائمة جداول الحصص
+        function loadSchedulesList() {
+            const schedulesList = document.getElementById('schedules-list');
+            schedulesList.innerHTML = '';
+            
+            const schedules = JSON.parse(localStorage.getItem('schedules'));
+            const courses = JSON.parse(localStorage.getItem('courses'));
+            
+            for (const schedule of schedules) {
+                const course = courses.find(c => c.id === schedule.courseId);
+                
+                if (!course) continue;
+                
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td class="px-4 py-2 border-t">${course.name} (${course.code})</td>
+                    <td class="px-4 py-2 border-t">${translateType(schedule.type)}</td>
+                    <td class="px-4 py-2 border-t">${translateDay(schedule.day)}</td>
+                    <td class="px-4 py-2 border-t">${formatTime(schedule.startTime)} - ${formatTime(schedule.endTime)}</td>
+                    <td class="px-4 py-2 border-t">${schedule.room}</td>
+                    <td class="px-4 py-2 border-t">
+                        <button class="delete-schedule px-2 py-1 bg-red-500 text-white rounded-md hover:bg-opacity-90 transition-all" data-schedule-id="${schedule.id}">حذف</button>
+                    </td>
+                `;
+                
+                schedulesList.appendChild(row);
+            }
+            
+            // إضافة مستمعي الأحداث
+            document.querySelectorAll('.delete-schedule').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const scheduleId = this.getAttribute('data-schedule-id');
+                    deleteSchedule(scheduleId);
+                });
+            });
+        }
+
+        // إضافة حصة جديدة إلى الجدول
+        function addSchedule() {
+            const courseId = document.getElementById('schedule-course').value;
+            const type = document.getElementById('schedule-type').value;
+            const day = document.getElementById('schedule-day').value;
+            const startTime = document.getElementById('schedule-start-time').value;
+            const endTime = document.getElementById('schedule-end-time').value;
+            const room = document.getElementById('schedule-room').value;
+            
+            if (!courseId || !type || !day || !startTime || !endTime || !room) {
+                alert('الرجاء ملء جميع الحقول المطلوبة');
+                return;
+            }
+            
+            const course = getCourseById(courseId);
+            
+            // التحقق من صلاحية النوع مع مكونات المادة
+            if ((type === 'td' && !course.components.hasTD) ||
+                (type === 'tp' && !course.components.hasTP)) {
+                alert('هذا النوع من الحصص غير متاح لهذه المادة');
+                return;
+            }
+            
+            const schedules = JSON.parse(localStorage.getItem('schedules'));
+            
+            // إنشاء معرف فريد للحصة
+            const scheduleId = 'schedule' + (schedules.length + 1);
+            
+            const newSchedule = {
+                id: scheduleId,
+                courseId: courseId,
+                type: type,
+                day: day,
+                startTime: startTime,
+                endTime: endTime,
+                room: room
+            };
+            
+            schedules.push(newSchedule);
+            
+            localStorage.setItem('schedules', JSON.stringify(schedules));
+            
+            // إعادة تحميل قائمة الحصص
+            loadSchedulesList();
+            
+            // مسح حقول الإدخال
+            document.getElementById('schedule-room').value = '';
+        }
+
+        // حذف حصة من الجدول
+        function deleteSchedule(scheduleId) {
+            if (confirm('هل أنت متأكد من حذف هذه الحصة؟')) {
+                const schedules = JSON.parse(localStorage.getItem('schedules'));
+                
+                const updatedSchedules = schedules.filter(schedule => schedule.id !== scheduleId);
+                
+                localStorage.setItem('schedules', JSON.stringify(updatedSchedules));
+                
+                // إعادة تحميل قائمة الحصص
+                loadSchedulesList();
+            }
+        }
+
+        // تحميل قائمة جداول الامتحانات
+        function loadExamsList() {
+            const examsList = document.getElementById('exams-list');
+            examsList.innerHTML = '';
+            
+            const exams = JSON.parse(localStorage.getItem('exams'));
+            const courses = JSON.parse(localStorage.getItem('courses'));
+            
+            for (const exam of exams) {
+                const course = courses.find(c => c.id === exam.courseId);
+                
+                if (!course) continue;
+                
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td class="px-4 py-2 border-t">${course.name} (${course.code})</td>
+                    <td class="px-4 py-2 border-t">${formatDate(exam.date)}</td>
+                    <td class="px-4 py-2 border-t">${formatTime(exam.startTime)} - ${formatTime(exam.endTime)}</td>
+                    <td class="px-4 py-2 border-t">${exam.room}</td>
+                    <td class="px-4 py-2 border-t">
+                        <button class="delete-exam px-2 py-1 bg-red-500 text-white rounded-md hover:bg-opacity-90 transition-all" data-exam-id="${exam.id}">حذف</button>
+                    </td>
+                `;
+                
+                examsList.appendChild(row);
+            }
+            
+            // إضافة مستمعي الأحداث
+            document.querySelectorAll('.delete-exam').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const examId = this.getAttribute('data-exam-id');
+                    deleteExam(examId);
+                });
+            });
+        }
+
+        // إضافة امتحان جديد إلى الجدول
+        function addExam() {
+            const courseId = document.getElementById('exam-course').value;
+            const date = document.getElementById('exam-date').value;
+            const startTime = document.getElementById('exam-start-time').value;
+            const endTime = document.getElementById('exam-end-time').value;
+            const room = document.getElementById('exam-room').value;
+            
+            if (!courseId || !date || !startTime || !endTime || !room) {
+                alert('الرجاء ملء جميع الحقول المطلوبة');
+                return;
+            }
+            
+            const course = getCourseById(courseId);
+            
+            // التحقق من صلاحية الامتحان مع مكونات المادة
+            if (!course.components.hasExam) {
+                alert('هذه المادة لا تتضمن امتحان');
+                return;
+            }
+            
+            const exams = JSON.parse(localStorage.getItem('exams'));
+            
+            // إنشاء معرف فريد للامتحان
+            const examId = 'exam' + (exams.length + 1);
+            
+            const newExam = {
+                id: examId,
+                courseId: courseId,
+                date: date,
+                startTime: startTime,
+                endTime: endTime,
+                room: room
+            };
+            
+            exams.push(newExam);
+            
+            localStorage.setItem('exams', JSON.stringify(exams));
+            
+            // إعادة تحميل قائمة الامتحانات
+            loadExamsList();
+            
+            // مسح حقول الإدخال
+            document.getElementById('exam-date').value = '';
+            document.getElementById('exam-room').value = '';
+        }
+
+        // حذف امتحان من الجدول
+        function deleteExam(examId) {
+            if (confirm('هل أنت متأكد من حذف هذا الامتحان؟')) {
+                const exams = JSON.parse(localStorage.getItem('exams'));
+                
+                const updatedExams = exams.filter(exam => exam.id !== examId);
+                
+                localStorage.setItem('exams', JSON.stringify(updatedExams));
+                
+                // إعادة تحميل قائمة الامتحانات
+                loadExamsList();
+            }
+        }
+
+        // تصدير قوائم الطلبة إلى PDF
+        function exportStudentsToPDF() {
+            generatePDF('students-list', 'قائمة_الطلبة.pdf', {
+                title: 'قائمة الطلبة',
+                orientation: 'landscape'
+            });
+        }
+
+        // تصدير قوائم الطلبة إلى Excel
+        function exportStudentsToExcel() {
+            const students = getAllUsers('student');
+            const data = [];
+            
+            for (const username in students) {
+                const student = students[username];
+                const overallAverage = calculateOverallAverage(username);
+                const creditsEarned = calculateCredits(username);
+                
+                data.push({
+                    'اسم المستخدم': student.username,
+                    'الاسم': student.firstName,
+                    'اللقب': student.lastName,
+                    'رقم التسجيل': student.regNumber,
+                    'المعدل العام': overallAverage ? overallAverage.toFixed(2) : '-',
+                    'الأرصدة': creditsEarned
+                });
+            }
+            
+            exportToExcel(data, 'قائمة الطلبة', 'قائمة_الطلبة.xlsx');
+        }
+
+        // تصدير جدول الحصص إلى PDF
+        function exportScheduleToPDF() {
+            generatePDF('schedules-list', 'جدول_الحصص.pdf', {
+                title: 'جدول الحصص',
+                orientation: 'landscape'
+            });
+        }
+
+        // تصدير جدول الامتحانات إلى PDF
+        function exportExamsToPDF() {
+            generatePDF('exams-list', 'جدول_الامتحانات.pdf', {
+                title: 'جدول الامتحانات',
+                orientation: 'landscape'
+            });
+        }
+
+        // تحميل بيانات لوحة تحكم الأستاذ
+        function loadTeacherDashboard() {
+            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            
+            // عرض القسم الافتراضي
+            document.querySelectorAll('.teacher-section').forEach(section => {
+                section.classList.add('hidden');
+            });
+            document.getElementById('my-courses').classList.remove('hidden');
+            
+            // تحميل قائمة المواد
+            loadTeacherCourses();
+            
+            // تحميل جدول الحصص
+            loadTeacherSchedule();
+            
+            // تحميل جدول الامتحانات
+            loadTeacherExams();
+            
+            // تحميل الإشعارات
+            loadTeacherNotifications();
+        }
+
+        // تحميل قائمة المواد للأستاذ
+        function loadTeacherCourses() {
+            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            const teacherCoursesContainer = document.getElementById('teacher-courses');
+            teacherCoursesContainer.innerHTML = '';
+            
+            const courses = getCoursesByTeacher(currentUser.username);
+            
+            for (const course of courses) {
+                const card = document.createElement('div');
+                card.className = 'card p-4 rounded-lg';
+                
+                const teacherTypes = [];
+                if (course.teachers.lecture === currentUser.username) teacherTypes.push('محاضرة');
+                if (course.teachers.td === currentUser.username) teacherTypes.push('أعمال توجيهية');
+                if (course.teachers.tp === currentUser.username) teacherTypes.push('أعمال تطبيقية');
+                
+                card.innerHTML = `
+                    <h3 class="text-lg font-bold mb-2">${course.name}</h3>
+                    <div class="text-sm opacity-75 mb-2">الرمز: ${course.code}</div>
+                    <div class="text-sm mb-4">المهام: ${teacherTypes.join(', ')}</div>
+                    <div class="flex flex-wrap gap-2">
+                        ${course.teachers.lecture === currentUser.username ? `
+                            <button class="manage-grades px-3 py-1 bg-primary text-white rounded-md hover:bg-opacity-90 transition-all" 
+                                    data-course-id="${course.id}" data-component="lecture">
+                                إدخال علامات المحاضرة
+                            </button>
+                        ` : ''}
+                        
+                        ${(course.components.hasTD && course.teachers.td === currentUser.username) ? `
+                            <button class="manage-grades px-3 py-1 bg-primary text-white rounded-md hover:bg-opacity-90 transition-all" 
+                                    data-course-id="${course.id}" data-component="td">
+                                إدخال علامات الأعمال التوجيهية
+                            </button>
+                        ` : ''}
+                        
+                        ${(course.components.hasTP && course.teachers.tp === currentUser.username) ? `
+                            <button class="manage-grades px-3 py-1 bg-primary text-white rounded-md hover:bg-opacity-90 transition-all" 
+                                    data-course-id="${course.id}" data-component="tp">
+                                إدخال علامات الأعمال التطبيقية
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+                
+                teacherCoursesContainer.appendChild(card);
+            }
+            
+            // إضافة مستمعي الأحداث
+            document.querySelectorAll('.manage-grades').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const courseId = this.getAttribute('data-course-id');
+                    const component = this.getAttribute('data-component');
+                    openGradesModal(courseId, component);
+                });
+            });
+        }
+
+        // فتح نافذة إدخال العلامات
+        function openGradesModal(courseId, component) {
+            const course = getCourseById(courseId);
+            const students = getAllUsers('student');
+            const grades = JSON.parse(localStorage.getItem('grades'));
+            
+            // تحديث عنوان النافذة
+            document.getElementById('grade-modal-title').textContent = 'إدخال العلامات';
+            document.getElementById('grade-course-info').textContent = `${course.name} (${course.code})`;
+            
+            let componentInfo = '';
+            switch (component) {
+                case 'lecture':
+                    componentInfo = 'امتحان';
+                    break;
+                case 'td':
+                    componentInfo = 'أعمال توجيهية';
+                    break;
+                case 'tp':
+                    componentInfo = 'أعمال تطبيقية';
+                    break;
+                default:
+                    componentInfo = '';
+            }
+            
+            document.getElementById('grade-component-info').textContent = componentInfo;
+            
+            // ملء قائمة الطلبة وعلاماتهم
+            const studentsList = document.getElementById('students-grades-list');
+            studentsList.innerHTML = '';
+            
+            for (const username in students) {
+                const student = students[username];
+                const row = document.createElement('tr');
+                
+                let gradeValue = '';
+                if (grades[username] && grades[username][courseId]) {
+                    if (component === 'lecture') {
+                        gradeValue = grades[username][courseId].exam || '';
+                    } else if (component === 'td') {
+                        gradeValue = grades[username][courseId].td || '';
+                    } else if (component === 'tp') {
+                        gradeValue = grades[username][courseId].tp || '';
+                    }
+                }
+                
+                row.innerHTML = `
+                    <td class="px-4 py-2 border-t">${student.firstName}</td>
+                    <td class="px-4 py-2 border-t">${student.lastName}</td>
+                    <td class="px-4 py-2 border-t">${student.regNumber}</td>
+                    <td class="px-4 py-2 border-t">
+                        <input type="number" class="student-grade w-full px-3 py-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-primary text-base"
+                               min="0" max="20" step="0.5" value="${gradeValue}" data-username="${student.username}">
+                    </td>
+                `;
+                
+                studentsList.appendChild(row);
+            }
+            
+            // إضافة البيانات كسمات مخصصة للزر حفظ
+            document.getElementById('save-grades').setAttribute('data-course-id', courseId);
+            document.getElementById('save-grades').setAttribute('data-component', component);
+            
+            // إضافة البيانات لأزرار الاستيراد والتصدير
+            document.getElementById('import-grades-excel').setAttribute('data-course-id', courseId);
+            document.getElementById('import-grades-excel').setAttribute('data-component', component);
+            
+            document.getElementById('export-grades-excel').setAttribute('data-course-id', courseId);
+            document.getElementById('export-grades-excel').setAttribute('data-component', component);
+            
+            document.getElementById('export-grades-pdf').setAttribute('data-course-id', courseId);
+            document.getElementById('export-grades-pdf').setAttribute('data-component', component);
+            
+            // عرض النافذة
+            document.getElementById('course-grades-modal').classList.remove('hidden');
+        }
+
+        // حفظ العلامات
+        function saveGrades() {
+            const courseId = document.getElementById('save-grades').getAttribute('data-course-id');
+            const component = document.getElementById('save-grades').getAttribute('data-component');
+            
+            const grades = JSON.parse(localStorage.getItem('grades'));
+            
+            // جمع العلامات من الفورم
+            document.querySelectorAll('.student-grade').forEach(input => {
+                const username = input.getAttribute('data-username');
+                const value = parseFloat(input.value);
+                
+                if (!isNaN(value)) {
+                    if (!grades[username]) {
+                        grades[username] = {};
+                    }
+                    
+                    if (!grades[username][courseId]) {
+                        grades[username][courseId] = {};
+                    }
+                    
+                    if (component === 'lecture') {
+                        grades[username][courseId].exam = value;
+                    } else if (component === 'td') {
+                        grades[username][courseId].td = value;
+                    } else if (component === 'tp') {
+                        grades[username][courseId].tp = value;
+                    }
+                }
+            });
+            
+            localStorage.setItem('grades', JSON.stringify(grades));
+            
+            // إغلاق النافذة
+            document.getElementById('course-grades-modal').classList.add('hidden');
+        }
+
+        // تصدير العلامات إلى Excel
+        function exportGradesToExcel() {
+            const courseId = document.getElementById('export-grades-excel').getAttribute('data-course-id');
+            const component = document.getElementById('export-grades-excel').getAttribute('data-component');
+            const course = getCourseById(courseId);
+            
+            const students = getAllUsers('student');
+            const grades = JSON.parse(localStorage.getItem('grades'));
+            
+            let componentName = '';
+            switch (component) {
+                case 'lecture':
+                    componentName = 'امتحان';
+                    break;
+                case 'td':
+                    componentName = 'أعمال توجيهية';
+                    break;
+                case 'tp':
+                    componentName = 'أعمال تطبيقية';
+                    break;
+                default:
+                    componentName = '';
+            }
+            
+            const data = [];
+            
+            for (const username in students) {
+                const student = students[username];
+                
+                let gradeValue = '';
+                if (grades[username] && grades[username][courseId]) {
+                    if (component === 'lecture') {
+                        gradeValue = grades[username][courseId].exam || '';
+                    } else if (component === 'td') {
+                        gradeValue = grades[username][courseId].td || '';
+                    } else if (component === 'tp') {
+                        gradeValue = grades[username][courseId].tp || '';
+                    }
+                }
+                
+                data.push({
+                    'رقم التسجيل': student.regNumber,
+                    'الاسم': student.firstName,
+                    'اللقب': student.lastName,
+                    'العلامة': gradeValue
+                });
+            }
+            
+            exportToExcel(data, `${course.name} - ${componentName}`, `${course.code}_${componentName}.xlsx`);
+        }
+
+        // استيراد العلامات من Excel
+        function importGradesFromExcel() {
+            document.getElementById('excel-import-input').click();
+        }
+
+        // معالجة ملف Excel المستورد
+        function processExcelImport(file) {
+            const courseId = document.getElementById('import-grades-excel').getAttribute('data-course-id');
+            const component = document.getElementById('import-grades-excel').getAttribute('data-component');
+            
+            importFromExcel(file, function(data) {
+                const grades = JSON.parse(localStorage.getItem('grades'));
+                const students = getAllUsers('student');
+                
+                // تحويل الطلبة إلى Object مع رقم التسجيل كمفتاح للبحث السريع
+                const studentsByRegNum = {};
+                for (const username in students) {
+                    studentsByRegNum[students[username].regNumber] = username;
+                }
+                
+                // تحديث العلامات
+                data.forEach(row => {
+                    const regNum = row['رقم التسجيل'];
+                    const grade = parseFloat(row['العلامة']);
+                    
+                    if (regNum && !isNaN(grade) && studentsByRegNum[regNum]) {
+                        const username = studentsByRegNum[regNum];
+                        
+                        if (!grades[username]) {
+                            grades[username] = {};
+                        }
+                        
+                        if (!grades[username][courseId]) {
+                            grades[username][courseId] = {};
+                        }
+                        
+                        if (component === 'lecture') {
+                            grades[username][courseId].exam = grade;
+                        } else if (component === 'td') {
+                            grades[username][courseId].td = grade;
+                        } else if (component === 'tp') {
+                            grades[username][courseId].tp = grade;
+                        }
+                    }
+                });
+                
+                localStorage.setItem('grades', JSON.stringify(grades));
+                
+                // إعادة فتح النافذة لتحديث العلامات
+                openGradesModal(courseId, component);
+            });
+        }
+
+        // تصدير العلامات إلى PDF
+        function exportGradesToPDF() {
+            const courseId = document.getElementById('export-grades-pdf').getAttribute('data-course-id');
+            const component = document.getElementById('export-grades-pdf').getAttribute('data-component');
+            const course = getCourseById(courseId);
+            
+            let componentName = '';
+            switch (component) {
+                case 'lecture':
+                    componentName = 'امتحان';
+                    break;
+                case 'td':
+                    componentName = 'أعمال توجيهية';
+                    break;
+                case 'tp':
+                    componentName = 'أعمال تطبيقية';
+                    break;
+            }
+            
+            generatePDF('students-grades-list', `${course.code}_${componentName}.pdf`, {
+                title: `كشف علامات ${course.name} - ${componentName}`,
+                orientation: 'portrait'
+            });
+        }
+
+        // تحميل جدول الحصص للأستاذ
+        function loadTeacherSchedule() {
+            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            const teacherSchedules = getSchedulesByTeacher(currentUser.username);
+            
+            // مسح الجدول
+            for (const day of ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday']) {
+                document.getElementById(`${day}-schedule`).innerHTML = '';
+            }
+            
+            // ملء الجدول
+            for (const schedule of teacherSchedules) {
+                const dayContainer = document.getElementById(`${schedule.day}-schedule`);
+                
+                const scheduleItem = document.createElement('div');
+                scheduleItem.className = 'p-2 mb-2 rounded-md bg-primary bg-opacity-10 border border-primary';
+                
+                scheduleItem.innerHTML = `
+                    <div class="font-semibold">${schedule.course.name}</div>
+                    <div class="text-sm">${translateType(schedule.type)}</div>
+                    <div class="text-sm">${formatTime(schedule.startTime)} - ${formatTime(schedule.endTime)}</div>
+                    <div class="text-sm">القاعة: ${schedule.room}</div>
+                `;
+                
+                dayContainer.appendChild(scheduleItem);
+            }
+        }
+
+        // تحميل جدول الامتحانات للأستاذ
+        function loadTeacherExams() {
+            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            const teacherExamsList = document.getElementById('teacher-exams-list');
+            teacherExamsList.innerHTML = '';
+            
+            const teacherExams = getExamsByTeacher(currentUser.username);
+            
+            for (const exam of teacherExams) {
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td class="px-4 py-2 border-t">${exam.course.name} (${exam.course.code})</td>
+                    <td class="px-4 py-2 border-t">${formatDate(exam.date)}</td>
+                    <td class="px-4 py-2 border-t">${formatTime(exam.startTime)} - ${formatTime(exam.endTime)}</td>
+                    <td class="px-4 py-2 border-t">${exam.room}</td>
+                `;
+                
+                teacherExamsList.appendChild(row);
+            }
+        }
+
+        // تحميل الإشعارات للأستاذ
+        function loadTeacherNotifications() {
+            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            const notifications = JSON.parse(localStorage.getItem('notifications'));
+            const notificationsList = document.getElementById('notifications-list');
+            const notificationsCount = document.getElementById('notifications-count');
+            
+            notificationsList.innerHTML = '';
+            
+            if (!notifications[currentUser.username] || notifications[currentUser.username].length === 0) {
+                notificationsList.innerHTML = '<div class="text-sm text-center text-gray-500 dark:text-gray-400">لا توجد إشعارات</div>';
+                notificationsCount.classList.add('hidden');
+                return;
+            }
+            
+            // عد الإشعارات غير المقروءة
+            const unreadCount = notifications[currentUser.username].filter(n => !n.read).length;
+            
+            if (unreadCount > 0) {
+                notificationsCount.textContent = unreadCount;
+                notificationsCount.classList.remove('hidden');
+            } else {
+                notificationsCount.classList.add('hidden');
+            }
+            
+            // ملء قائمة الإشعارات
+            notifications[currentUser.username].forEach(notification => {
+                const notificationItem = document.createElement('div');
+                notificationItem.className = `p-2 mb-2 border-b ${notification.read ? 'opacity-60' : 'bg-primary bg-opacity-10 font-bold'}`;
+                
+                notificationItem.innerHTML = `
+                    <div class="text-sm">تم تخصيصك لمادة ${notification.courseName} (${notification.courseCode})</div>
+                    <div class="text-sm">النوع: ${notification.type}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">${new Date(notification.date).toLocaleString('ar-DZ')}</div>
+                    <button class="mark-read mt-1 text-xs px-2 py-1 bg-primary text-white rounded-md hover:bg-opacity-90 transition-all ${notification.read ? 'hidden' : ''}" data-id="${notification.id}">تحديد كمقروء</button>
+                `;
+                
+                notificationsList.appendChild(notificationItem);
+            });
+            
+            // إضافة مستمعي الأحداث
+            document.querySelectorAll('.mark-read').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const notificationId = this.getAttribute('data-id');
+                    markNotificationAsRead(notificationId);
+                });
+            });
+        }
+
+        // تحديد إشعار كمقروء
+        function markNotificationAsRead(notificationId) {
+            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            const notifications = JSON.parse(localStorage.getItem('notifications'));
+            
+            if (notifications[currentUser.username]) {
+                const notificationIndex = notifications[currentUser.username].findIndex(n => n.id === notificationId);
+                
+                if (notificationIndex !== -1) {
+                    notifications[currentUser.username][notificationIndex].read = true;
+                    localStorage.setItem('notifications', JSON.stringify(notifications));
+                    
+                    // إعادة تحميل الإشعارات
+                    loadTeacherNotifications();
+                }
+            }
+        }
+
+        // تحميل بيانات لوحة تحكم الطالب
+        function loadStudentDashboard() {
+            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            
+            // عرض القسم الافتراضي
+            document.querySelectorAll('.student-section').forEach(section => {
+                section.classList.add('hidden');
+            });
+            document.getElementById('my-grades').classList.remove('hidden');
+            
+            // تحميل قائمة العلامات
+            loadStudentGrades();
+            
+            // تحميل جدول الحصص
+            loadStudentSchedule();
+            
+            // تحميل جدول الامتحانات
+            loadStudentExams();
+            
+            // تحميل التقدم الدراسي
+            loadStudentProgress();
+            
+            // تحميل بيانات بطاقة الطالب
+            loadStudentProfile();
+        }
+
+        // تحميل قائمة العلامات للطالب
+        function loadStudentGrades() {
+            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            const studentGradesList = document.getElementById('student-grades-list');
+            studentGradesList.innerHTML = '';
+            
+            const courses = JSON.parse(localStorage.getItem('courses'));
+            const users = JSON.parse(localStorage.getItem('users'));
+            const grades = JSON.parse(localStorage.getItem('grades'));
+            
+            if (!grades[currentUser.username]) {
+                studentGradesList.innerHTML = '<tr><td colspan="7" class="px-4 py-2 text-center">لا توجد علامات مسجلة بعد</td></tr>';
+                return;
+            }
+            
+            const studentGrades = grades[currentUser.username];
+            
+            for (const courseId in studentGrades) {
+                const course = courses.find(c => c.id === courseId);
+                
+                if (!course) continue;
+                
+                const row = document.createElement('tr');
+                
+                const lectureTeacher = course.teachers.lecture ? `${users[course.teachers.lecture].firstName} ${users[course.teachers.lecture].lastName}` : '-';
+                
+                const tdGrade = studentGrades[courseId].td !== undefined ? studentGrades[courseId].td.toFixed(2) : '-';
+                const tpGrade = studentGrades[courseId].tp !== undefined ? studentGrades[courseId].tp.toFixed(2) : '-';
+                const examGrade = studentGrades[courseId].exam !== undefined ? studentGrades[courseId].exam.toFixed(2) : '-';
+                
+                const average = calculateCourseAverage(studentGrades[courseId], course);
+                const creditsEarned = average >= 10 ? course.credits : 0;
+                
+                row.innerHTML = `
+                    <td class="px-4 py-2 border-t">${course.name} (${course.code})</td>
+                    <td class="px-4 py-2 border-t">${lectureTeacher}</td>
+                    <td class="px-4 py-2 border-t ${course.components.hasTD ? (tdGrade >= 10 ? 'text-green-600 font-semibold' : 'text-red-600') : 'opacity-50'}">${course.components.hasTD ? tdGrade : 'غير متاح'}</td>
+                    <td class="px-4 py-2 border-t ${course.components.hasTP ? (tpGrade >= 10 ? 'text-green-600 font-semibold' : 'text-red-600') : 'opacity-50'}">${course.components.hasTP ? tpGrade : 'غير متاح'}</td>
+                    <td class="px-4 py-2 border-t ${course.components.hasExam ? (examGrade >= 10 ? 'text-green-600 font-semibold' : 'text-red-600') : 'opacity-50'}">${course.components.hasExam ? examGrade : 'غير متاح'}</td>
+                    <td class="px-4 py-2 border-t ${average >= 10 ? 'text-green-600 font-semibold' : 'text-red-600'}">${average !== null ? average.toFixed(2) : '-'}</td>
+                    <td class="px-4 py-2 border-t">${creditsEarned} / ${course.credits}</td>
+                `;
+                
+                studentGradesList.appendChild(row);
+            }
+            
+            // إضافة المعدل العام
+            const overallAverage = calculateOverallAverage(currentUser.username);
+            
+            if (overallAverage !== null) {
+                document.getElementById('student-overall-average').textContent = overallAverage.toFixed(2);
+                document.getElementById('student-overall-average').className = overallAverage >= 10 ? 'text-green-600 font-semibold' : 'text-red-600';
+            } else {
+                document.getElementById('student-overall-average').textContent = '-';
+            }
+        }
+
+        // تحميل جدول الحصص للطالب
+        function loadStudentSchedule() {
+            const schedules = JSON.parse(localStorage.getItem('schedules'));
+            const courses = JSON.parse(localStorage.getItem('courses'));
+            
+            // مسح الجدول
+            for (const day of ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday']) {
+                document.getElementById(`student-${day}-schedule`).innerHTML = '';
+            }
+            
+            // ملء الجدول
+            for (const schedule of schedules) {
+                const course = courses.find(c => c.id === schedule.courseId);
+                
+                if (!course) continue;
+                
+                const dayContainer = document.getElementById(`student-${schedule.day}-schedule`);
+                
+                const scheduleItem = document.createElement('div');
+                scheduleItem.className = 'p-2 mb-2 rounded-md bg-primary bg-opacity-10 border border-primary';
+                
+                scheduleItem.innerHTML = `
+                    <div class="font-semibold">${course.name}</div>
+                    <div class="text-sm">${translateType(schedule.type)}</div>
+                    <div class="text-sm">${formatTime(schedule.startTime)} - ${formatTime(schedule.endTime)}</div>
+                    <div class="text-sm">القاعة: ${schedule.room}</div>
+                `;
+                
+                dayContainer.appendChild(scheduleItem);
+            }
+        }
+
+        // تحميل جدول الامتحانات للطالب
+        function loadStudentExams() {
+            const exams = JSON.parse(localStorage.getItem('exams'));
+            const courses = JSON.parse(localStorage.getItem('courses'));
+            
+            const studentExamsList = document.getElementById('student-exams-list');
+            studentExamsList.innerHTML = '';
+            
+            for (const exam of exams) {
+                const course = courses.find(c => c.id === exam.courseId);
+                
+                if (!course) continue;
+                
+                const row = document.createElement('tr');
+                
+                row.innerHTML = `
+                    <td class="px-4 py-2 border-t">${course.name} (${course.code})</td>
+                    <td class="px-4 py-2 border-t">${formatDate(exam.date)}</td>
+                    <td class="px-4 py-2 border-t">${formatTime(exam.startTime)} - ${formatTime(exam.endTime)}</td>
+                    <td class="px-4 py-2 border-t">${exam.room}</td>
+                `;
+                
+                studentExamsList.appendChild(row);
+            }
+        }
+
+        // تحميل التقدم الدراسي للطالب
+        function loadStudentProgress() {
+            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            
+            const courses = JSON.parse(localStorage.getItem('courses'));
+            const grades = JSON.parse(localStorage.getItem('grades'));
+            
+            // تحميل ملخص التقدم
+            const overallAverage = calculateOverallAverage(currentUser.username);
+            const creditsEarned = calculateCredits(currentUser.username);
+            
+            document.getElementById('earned-credits').textContent = creditsEarned;
+            document.getElementById('progress-average').textContent = overallAverage !== null ? overallAverage.toFixed(2) : '-';
+            document.getElementById('progress-average').className = overallAverage >= 10 ? 'text-3xl font-bold text-green-600' : 'text-3xl font-bold text-red-600';
+            
+            // تحديد الحالة
+            let status = '';
+            let statusDetail = '';
+            
+            if (creditsEarned === 30) {
+                status = 'ناجح';
+                statusDetail = 'اكتمال جميع الأرصدة المطلوبة';
+                document.getElementById('student-status').className = 'text-3xl font-bold text-green-600';
+            } else if (overallAverage !== null && overallAverage >= 10) {
+                status = 'ناجح بالمعدل';
+                statusDetail = 'النجاح بالمعدل العام، إعادة المواد التي لم تكتمل';
+                document.getElementById('student-status').className = 'text-3xl font-bold text-green-600';
+            } else if (creditsEarned >= 15) {
+                status = 'ناجح مع ديون';
+                statusDetail = 'إعادة المواد التي لم تكتمل';
+                document.getElementById('student-status').className = 'text-3xl font-bold text-yellow-600';
+            } else {
+                status = 'راسب';
+                statusDetail = 'يجب إعادة السنة';
+                document.getElementById('student-status').className = 'text-3xl font-bold text-red-600';
+            }
+            
+            document.getElementById('student-status').textContent = status;
+            document.getElementById('student-status-detail').textContent = statusDetail;
+            
+            // تحميل تفاصيل المواد
+            const coursesProgressList = document.getElementById('courses-progress-list');
+            coursesProgressList.innerHTML = '';
+            
+            if (!grades[currentUser.username]) {
+                coursesProgressList.innerHTML = '<tr><td colspan="6" class="px-4 py-2 text-center">لا توجد علامات مسجلة بعد</td></tr>';
+                return;
+            }
+            
+            const studentGrades = grades[currentUser.username];
+            
+            for (const courseId in studentGrades) {
+                const course = courses.find(c => c.id === courseId);
+                
+                if (!course) continue;
+                
+                const row = document.createElement('tr');
+                
+                const average = calculateCourseAverage(studentGrades[courseId], course);
+                const creditsAvailable = course.credits;
+                const creditsEarned = average >= 10 ? course.credits : 0;
+                
+                let status = '';
+                if (average >= 10) {
+                    status = 'ناجح';
+                    row.classList.add('bg-green-50', 'dark:bg-green-900', 'dark:bg-opacity-20');
+                } else {
+                    status = 'راسب';
+                    row.classList.add('bg-red-50', 'dark:bg-red-900', 'dark:bg-opacity-20');
+                }
+                
+                row.innerHTML = `
+                    <td class="px-4 py-2 border-t">${course.name}</td>
+                    <td class="px-4 py-2 border-t">${course.code}</td>
+                    <td class="px-4 py-2 border-t ${average >= 10 ? 'text-green-600 font-semibold' : 'text-red-600'}">${average !== null ? average.toFixed(2) : '-'}</td>
+                    <td class="px-4 py-2 border-t">${creditsAvailable}</td>
+                    <td class="px-4 py-2 border-t">${creditsEarned}</td>
+                    <td class="px-4 py-2 border-t font-semibold ${average >= 10 ? 'text-green-600' : 'text-red-600'}">${status}</td>
+                `;
+                
+                coursesProgressList.appendChild(row);
+            }
+        }
+
+        // تحميل بيانات بطاقة الطالب
+        function loadStudentProfile() {
+            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            
+            document.getElementById('profile-full-name').textContent = `${currentUser.firstName} ${currentUser.lastName}`;
+            document.getElementById('profile-reg-number').textContent = currentUser.regNumber;
+            document.getElementById('profile-username').textContent = currentUser.username;
+            
+            const overallAverage = calculateOverallAverage(currentUser.username);
+            const creditsEarned = calculateCredits(currentUser.username);
+            
+            document.getElementById('profile-average').textContent = overallAverage !== null ? `${overallAverage.toFixed(2)} / 20` : '-';
+            document.getElementById('profile-average').className = overallAverage >= 10 ? 'font-semibold text-green-600' : 'font-semibold text-red-600';
+            
+            document.getElementById('profile-credits').textContent = `${creditsEarned} / 30`;
+            
+            // تحديد الحالة
+            let status = '';
+            
+            if (creditsEarned === 30) {
+                status = 'ناجح';
+                document.getElementById('profile-status').className = 'font-semibold text-green-600';
+            } else if (overallAverage !== null && overallAverage >= 10) {
+                status = 'ناجح بالمعدل';
+                document.getElementById('profile-status').className = 'font-semibold text-green-600';
+            } else if (creditsEarned >= 15) {
+                status = 'ناجح مع ديون';
+                document.getElementById('profile-status').className = 'font-semibold text-yellow-600';
+            } else {
+                status = 'راسب';
+                document.getElementById('profile-status').className = 'font-semibold text-red-600';
+            }
+            
+            document.getElementById('profile-status').textContent = status;
+        }
+
+        // تصدير كشف العلامات للطالب
+        function exportStudentGradesToPDF() {
+            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            
+            generatePDF('student-grades-list', `كشف_علامات_${currentUser.firstName}_${currentUser.lastName}.pdf`, {
+                title: `كشف علامات الطالب: ${currentUser.firstName} ${currentUser.lastName}`,
+                orientation: 'landscape'
+            });
+        }
+
+        // تصدير بطاقة الطالب
+        function exportStudentCardToPDF() {
+            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            
+            // إنشاء بطاقة الطالب
+            const cardHTML = `
+                <div class="w-full max-w-md mx-auto p-6 border-2 border-primary rounded-lg">
+                    <div class="text-center mb-6">
+                        <h1 class="text-xl font-bold text-primary">بطاقة الطالب</h1>
+                        <p class="text-sm mt-2">السنة الدراسية 2023-2024</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 gap-4 mb-6">
+                        <div>
+                            <div class="text-sm opacity-75">الاسم الكامل</div>
+                            <div class="font-semibold">${currentUser.firstName} ${currentUser.lastName}</div>
+                        </div>
+                        <div>
+                            <div class="text-sm opacity-75">رقم التسجيل</div>
+                            <div class="font-semibold">${currentUser.regNumber}</div>
+                        </div>
+                        <div>
+                            <div class="text-sm opacity-75">اسم المستخدم</div>
+                            <div class="font-semibold">${currentUser.username}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center mt-6">
+                        <div class="text-sm opacity-75">تاريخ الإصدار</div>
+                        <div class="font-semibold">${new Date().toLocaleDateString('ar-DZ')}</div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('pdf-content').innerHTML = cardHTML;
+            
+            html2canvas(document.getElementById('pdf-content'), {
+                scale: 2
+            }).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('portrait', 'mm', 'a4');
+                
+                const imgWidth = 190;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                
+                pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+                pdf.save(`بطاقة_${currentUser.firstName}_${currentUser.lastName}.pdf`);
+                
+                document.getElementById('pdf-content').innerHTML = '';
+            });
+        }
+
+        // مستمعي الأحداث
+        document.addEventListener('DOMContentLoaded', function() {
+            // تهيئة البيانات
+            initializeData();
+            
+            // مستمع لزر تسجيل الدخول
+            document.getElementById('login-btn').addEventListener('click', login);
+            
+            // مستمعي أزرار تسجيل الخروج
+            document.getElementById('admin-logout').addEventListener('click', logout);
+            document.getElementById('teacher-logout').addEventListener('click', logout);
+            document.getElementById('student-logout').addEventListener('click', logout);
+            
+            // مستمعي أزرار التنقل للمدير
+            document.querySelectorAll('.admin-nav-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const target = this.getAttribute('data-target');
+                    
+                    document.querySelectorAll('.admin-section').forEach(section => {
+                        section.classList.add('hidden');
+                    });
+                    
+                    document.getElementById(target).classList.remove('hidden');
+                });
+            });
+            
+            // مستمعي أزرار التنقل للأستاذ
+            document.querySelectorAll('.teacher-nav-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const target = this.getAttribute('data-target');
+                    
+                    document.querySelectorAll('.teacher-section').forEach(section => {
+                        section.classList.add('hidden');
+                    });
+                    
+                    document.getElementById(target).classList.remove('hidden');
+                });
+            });
+            
+            // مستمعي أزرار التنقل للطالب
+            document.querySelectorAll('.student-nav-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const target = this.getAttribute('data-target');
+                    
+                    document.querySelectorAll('.student-section').forEach(section => {
+                        section.classList.add('hidden');
+                    });
+                    
+                    document.getElementById(target).classList.remove('hidden');
+                });
+            });
+            
+            // مستمعي أزرار الإضافة
+            document.getElementById('add-teacher-btn').addEventListener('click', addTeacher);
+            document.getElementById('add-student-btn').addEventListener('click', addStudent);
+            document.getElementById('add-course-btn').addEventListener('click', addCourse);
+            document.getElementById('add-schedule-btn').addEventListener('click', addSchedule);
+            document.getElementById('add-exam-btn').addEventListener('click', addExam);
+            
+            // مستمعي أزرار التصدير
+            document.getElementById('export-students-excel').addEventListener('click', exportStudentsToExcel);
+            document.getElementById('export-students-pdf').addEventListener('click', exportStudentsToPDF);
+            document.getElementById('export-schedule-pdf').addEventListener('click', exportScheduleToPDF);
+            document.getElementById('export-exams-pdf').addEventListener('click', exportExamsToPDF);
+            
+            // مستمعي أزرار إدارة النقاط
+            document.getElementById('close-grades-modal').addEventListener('click', function() {
+                document.getElementById('course-grades-modal').classList.add('hidden');
+            });
+            
+            document.getElementById('save-grades').addEventListener('click', saveGrades);
+            
+            document.getElementById('export-grades-excel').addEventListener('click', exportGradesToExcel);
+            document.getElementById('export-grades-pdf').addEventListener('click', exportGradesToPDF);
+            
+            document.getElementById('import-grades-excel').addEventListener('click', importGradesFromExcel);
+            document.getElementById('excel-import-input').addEventListener('change', function(e) {
+                if (e.target.files.length > 0) {
+                    processExcelImport(e.target.files[0]);
+                }
+            });
+            
+            // مستمعي أزرار الإشعارات
+            document.getElementById('teacher-notifications-btn').addEventListener('click', function() {
+                const dropdown = document.getElementById('notifications-dropdown');
+                dropdown.classList.toggle('hidden');
+            });
+
+            // مستمعي أزرار الطالب
+            document.getElementById('student-export-grades-pdf').addEventListener('click', exportStudentGradesToPDF);
+            document.getElementById('export-student-card').addEventListener('click', exportStudentCardToPDF);
+            
+            // إذا كان هناك مستخدم مسجل، قم بتسجيل الدخول تلقائيًا
+            const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+            
+            if (currentUser) {
+                document.getElementById('login-screen').classList.add('hidden');
+                
+                if (currentUser.role === 'admin') {
+                    document.getElementById('admin-dashboard').classList.remove('hidden');
+                    document.getElementById('admin-name').textContent = `${currentUser.firstName} ${currentUser.lastName}`;
+                    loadAdminDashboard();
+                } else if (currentUser.role === 'teacher') {
+                    document.getElementById('teacher-dashboard').classList.remove('hidden');
+                    document.getElementById('teacher-name').textContent = `${currentUser.firstName} ${currentUser.lastName}`;
+                    loadTeacherDashboard();
+                } else if (currentUser.role === 'student') {
+                    document.getElementById('student-dashboard').classList.remove('hidden');
+                    document.getElementById('student-name').textContent = `${currentUser.firstName} ${currentUser.lastName}`;
+                    loadStudentDashboard();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
